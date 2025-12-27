@@ -1,3 +1,34 @@
+## JS CORE
+
+1. Типы данных в JavaScript
+2. Разница между `null` и `undefined`
+3. Отличия `var`, `let` и `const`
+4. Strict mode в JavaScript
+5. Что такое hoisting
+6. Разница между `function declaration` и `function expression`
+7. Стрелочные функции
+8. Что такое `this` и как он определяется
+9. `call`, `apply`, `bind`
+10. Что такое замыкание
+11. Как передаются аргументы в функции JavaScript
+12. Разница между `==` и `===`
+13. Как проверить значение на `NaN`
+14. Изменяемы ли строки в JavaScript
+15. Что такое область видимости (scope)
+16. Что такое прототип
+17. Что находится в конце цепочки прототипов
+18. Разница между поверхностным и глубоким копированием
+19. Способы копирования объектов в JavaScript
+20. Как сделать глубокую копию объекта
+21. `map`, `filter`, `reduce`
+22. Разница между `map` и `forEach`
+23. `Set`, `Map`, `WeakSet`, `WeakMap`
+24. IIFE (Immediately Invoked Function Expression)
+25. Что такое Promise и какие у него состояния
+26. Способы обработки ошибок в Promise
+27. Что такое `async / await`
+28. Что такое Event Loop и зачем он нужен
+
 ## 1. Типы данных в JavaScript
 
 Кратко:  
@@ -597,4 +628,239 @@ const copy = structuredClone(obj);
 copy.b.c = 3;
 
 console.log(obj.b.c); // 2
+```
+
+## 21. `map`, `filter`, `reduce`
+
+Кратко:  
+Это методы массива для работы с данными без мутаций исходного массива.
+
+---
+
+Важно:
+
+- `map` — преобразует каждый элемент
+- `filter` — отбирает элементы по условию
+- `reduce` — сводит массив к одному значению
+- возвращают новый массив (кроме `reduce`)
+
+---
+
+Пример:
+
+```js
+const nums = [1, 2, 3, 4];
+
+const doubled = nums.map((n) => n * 2); // [2, 4, 6, 8]
+const even = nums.filter((n) => n % 2 === 0); // [2, 4]
+const sum = nums.reduce((acc, n) => acc + n, 0); // 10
+```
+
+## 22. Разница между `map` и `forEach`
+
+Кратко:  
+`map` используется для преобразования массива и возвращает новый массив.  
+`forEach` используется для выполнения действий и ничего не возвращает.
+
+---
+
+Важно:
+
+- `map` всегда возвращает новый массив
+- `forEach` возвращает `undefined`
+- `forEach` не подходит для цепочек преобразований
+
+---
+
+Пример:
+
+```js
+const arr = [1, 2, 3];
+
+const mapped = arr.map((n) => n * 2);
+const result = arr.forEach((n) => n * 2);
+
+console.log(mapped); // [2, 4, 6]
+console.log(result); // undefined
+```
+
+## 23. `Set`, `Map`, `WeakSet`, `WeakMap`
+
+Кратко:  
+Это коллекции для хранения данных, отличающиеся типами ключей и управлением памятью.
+
+---
+
+Важно:
+
+- `Set` хранит уникальные значения
+- `Map` хранит пары ключ–значение, где ключом может быть любой тип
+- `WeakSet` и `WeakMap` хранят только объекты
+- `Weak*` не мешают сборщику мусора
+
+---
+
+Пример:
+
+```js
+const set = new Set([1, 1, 2]);
+console.log(set); // {1, 2}
+
+const map = new Map();
+map.set({ id: 1 }, "value");
+
+const weakMap = new WeakMap();
+weakMap.set({ id: 2 }, "data");
+```
+
+## 24. IIFE (Immediately Invoked Function Expression)
+
+Кратко:  
+IIFE — это функция, которая вызывается сразу после объявления.
+
+---
+
+Важно:
+
+- создаёт собственную область видимости
+- использовалась до `let` и `const` для изоляции переменных
+- выполняется только один раз
+
+---
+
+Пример:
+
+```js
+(function () {
+  const a = 10;
+  console.log(a);
+})();
+```
+
+## 25. Что такое Promise и какие у него состояния
+
+Кратко:  
+Promise — это объект, представляющий результат асинхронной операции, которая может завершиться успешно или с ошибкой.
+
+---
+
+Состояния Promise:
+
+- `pending` — начальное состояние, операция ещё выполняется
+- `fulfilled` — операция успешно завершена (`resolve`)
+- `rejected` — операция завершилась ошибкой (`reject`)
+
+---
+
+Важно:
+
+- Promise может перейти только из `pending` в `fulfilled` или `rejected`
+- после смены состояния оно больше не меняется
+- результат доступен через `then`, ошибка — через `catch`
+
+---
+
+Пример:
+
+```js
+const promise = new Promise((resolve, reject) => {
+  setTimeout(() => {
+    resolve("done");
+  }, 1000);
+});
+
+promise
+  .then((result) => console.log(result))
+  .catch((error) => console.error(error));
+```
+
+## 26. Какими способами можно обработать ошибку в Promise
+
+Кратко:  
+Ошибки в Promise можно обрабатывать с помощью `.catch()` или `try / catch` при использовании `async / await`.
+
+---
+
+Важно:
+
+- `.catch()` ловит ошибки в цепочке `then`
+- `try / catch` работает только внутри `async` функции
+- `finally()` выполняется в любом случае
+
+---
+
+Пример:
+
+```js
+// через catch
+fetch("/api")
+  .then((res) => res.json())
+  .catch((err) => console.error(err))
+  .finally(() => console.log("done"));
+
+// через async / await
+async function load() {
+  try {
+    const res = await fetch("/api");
+  } catch (err) {
+    console.error(err);
+  }
+}
+```
+
+## 27. Что такое `async / await`
+
+Кратко:  
+`async / await` — это синтаксический сахар над Promise, который позволяет писать асинхронный код как синхронный.
+
+---
+
+Важно:
+
+- `async` функция всегда возвращает Promise
+- `await` приостанавливает выполнение до завершения Promise
+- ошибки обрабатываются через `try / catch`
+
+---
+
+Пример:
+
+```js
+async function load() {
+  const res = await fetch("/api");
+  const data = await res.json();
+  return data;
+}
+
+load().then((data) => console.log(data));
+```
+
+## 28. Что такое Event Loop и зачем он нужен
+
+Кратко:  
+Event Loop — это механизм, который позволяет JavaScript выполнять асинхронный код, не блокируя основной поток.
+
+---
+
+Важно:
+
+- JavaScript однопоточный
+- Event Loop управляет очередями задач
+- синхронный код выполняется первым
+- асинхронные задачи попадают в очереди и выполняются позже
+
+---
+
+Пример:
+
+```js
+console.log(1);
+
+setTimeout(() => {
+  console.log(2);
+}, 0);
+
+console.log(3);
+
+// 1 3 2
 ```
