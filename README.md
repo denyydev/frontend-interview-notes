@@ -3422,4 +3422,1158 @@ calculator.multiply(); // 50
 
 ---
 
-Продолжение следует... (темы 31-71 будут добавлены в следующей части)
+## 31. Как проверить, что значение — массив
+
+В JavaScript массивы технически являются объектами, поэтому обычная проверка `typeof` не работает. Нужны специальные методы.
+
+### ❌ Неправильные способы
+
+```js
+const arr = [1, 2, 3];
+
+typeof arr        // "object" ❌ (не подходит)
+arr instanceof Array  // true ✅ (работает, но есть нюансы)
+```
+
+**Проблема с `instanceof`:**
+- Не работает через iframe (разные контексты)
+- Может быть переопределено
+
+### ✅ Правильный способ: `Array.isArray()`
+
+**Рекомендуемый способ** — использовать `Array.isArray()`:
+
+```js
+Array.isArray([1, 2, 3]);      // true ✅
+Array.isArray({});             // false ✅
+Array.isArray("string");       // false ✅
+Array.isArray(null);           // false ✅
+Array.isArray(undefined);      // false ✅
+Array.isArray([]);             // true ✅
+```
+
+### Почему `Array.isArray()` лучше?
+
+1. **Надёжно** — работает везде, даже через iframe
+2. **Быстро** — оптимизированная встроенная функция
+3. **Понятно** — явно показывает намерение
+
+### Альтернативные способы (не рекомендуются)
+
+```js
+// Через Object.prototype.toString
+Object.prototype.toString.call([1, 2, 3]) === '[object Array]'  // true
+
+// Через конструктор (ненадёжно)
+[1, 2, 3].constructor === Array  // true (но можно обмануть)
+```
+
+### Пример использования
+
+```js
+function processData(data) {
+  if (Array.isArray(data)) {
+    // обрабатываем как массив
+    return data.map(item => item * 2);
+  } else {
+    // обрабатываем как объект
+    return { processed: data };
+  }
+}
+
+processData([1, 2, 3]);  // [2, 4, 6]
+processData({ x: 1 });   // { processed: { x: 1 } }
+```
+
+### Итоги
+
+- Используйте `Array.isArray()` для проверки массивов
+- `typeof` не работает (возвращает "object")
+- `instanceof` работает, но менее надёжен
+
+---
+
+## 32. Как проверить наличие свойства в объекте
+
+В JavaScript есть несколько способов проверить, есть ли свойство в объекте. Каждый имеет свои особенности.
+
+### Способ 1: Оператор `in`
+
+Оператор `in` проверяет свойство **в объекте и в его прототипе**:
+
+```js
+const obj = { name: "Alex" };
+
+"name" in obj;        // true ✅
+"age" in obj;         // false ✅
+"toString" in obj;    // true ⚠️ (из прототипа!)
+```
+
+### Способ 2: `hasOwnProperty()`
+
+Метод `hasOwnProperty()` проверяет только **собственные свойства** объекта (не из прототипа):
+
+```js
+const obj = { name: "Alex" };
+
+obj.hasOwnProperty("name");      // true ✅
+obj.hasOwnProperty("age");       // false ✅
+obj.hasOwnProperty("toString");  // false ✅ (не своё свойство)
+```
+
+### Способ 3: `Object.hasOwn()` (ES2022)
+
+Современный способ, аналогичный `hasOwnProperty()`, но более безопасный:
+
+```js
+const obj = { name: "Alex" };
+
+Object.hasOwn(obj, "name");      // true ✅
+Object.hasOwn(obj, "toString");  // false ✅
+```
+
+**Преимущество:** работает даже если объект создан с `Object.create(null)`.
+
+### Способ 4: Проверка через `undefined`
+
+Простейший способ, но **не всегда надёжен**:
+
+```js
+const obj = { name: "Alex", age: undefined };
+
+obj.name !== undefined;  // true ✅
+obj.age !== undefined;   // false ⚠️ (но свойство есть!)
+obj.city !== undefined;  // false ✅
+```
+
+**Проблема:** если свойство существует, но его значение `undefined`, проверка даст `false`.
+
+### Сравнительная таблица
+
+| Способ | Собственные свойства | Свойства прототипа | Значение `undefined` |
+|--------|---------------------|-------------------|---------------------|
+| `in` | ✅ | ✅ | ✅ |
+| `hasOwnProperty()` | ✅ | ❌ | ✅ |
+| `Object.hasOwn()` | ✅ | ❌ | ✅ |
+| `!== undefined` | ❌ | ❌ | ❌ |
+
+### ⚠️ Частая ошибка
+
+```js
+const obj = { name: "Alex", age: undefined };
+
+// Неправильно
+if (obj.age) {
+  console.log("Есть возраст");
+}  // не выполнится, т.к. undefined — falsy
+
+// Правильно
+if ("age" in obj) {
+  console.log("Свойство age существует");
+}  // выполнится
+```
+
+### Когда что использовать?
+
+- **`in`** — когда нужно проверить свойство включая прототип
+- **`hasOwnProperty()` / `Object.hasOwn()`** — когда нужны только собственные свойства (обычно так)
+- **`!== undefined`** — когда уверены, что значение не `undefined`
+
+### Итоги
+
+- `in` — проверяет свойство и в объекте, и в прототипе
+- `hasOwnProperty()` / `Object.hasOwn()` — только собственные свойства
+- Проверка через `undefined` ненадёжна
+
+---
+
+## 33. Разница между `in` и `hasOwnProperty`
+
+Это важное различие, которое часто вызывает путаницу. Давайте разберёмся подробно.
+
+### `in` — проверяет всю цепочку прототипов
+
+Оператор `in` проверяет свойство **во всём объекте**, включая прототип:
+
+```js
+const obj = { name: "Alex" };
+
+"name" in obj;           // true ✅ (собственное свойство)
+"toString" in obj;       // true ✅ (из прототипа Object)
+"valueOf" in obj;        // true ✅ (из прототипа Object)
+```
+
+### `hasOwnProperty()` — только собственные свойства
+
+Метод `hasOwnProperty()` проверяет только **собственные свойства** объекта, игнорируя прототип:
+
+```js
+const obj = { name: "Alex" };
+
+obj.hasOwnProperty("name");      // true ✅ (собственное свойство)
+obj.hasOwnProperty("toString");  // false ✅ (из прототипа, не собственное)
+obj.hasOwnProperty("valueOf");   // false ✅ (из прототипа)
+```
+
+### Визуальная аналогия
+
+Представьте объект как дом:
+- **`in`** — ищет ключ во всём доме, включая подвал (прототип)
+- **`hasOwnProperty()`** — ищет ключ только в основных комнатах (собственные свойства)
+
+### Пример с наследованием
+
+```js
+function Animal(name) {
+  this.name = name;
+}
+
+Animal.prototype.speak = function() {
+  console.log(this.name + " говорит");
+};
+
+const dog = new Animal("Рекс");
+
+// in — находит и собственные, и унаследованные свойства
+"name" in dog;       // true ✅ (собственное)
+"speak" in dog;      // true ✅ (из прототипа)
+
+// hasOwnProperty — только собственные
+dog.hasOwnProperty("name");   // true ✅
+dog.hasOwnProperty("speak");  // false ✅ (из прототипа)
+```
+
+### Когда что использовать?
+
+**Используйте `in`, когда:**
+- Нужно проверить, доступно ли свойство (включая методы прототипа)
+- Проверяете существование метода
+
+**Используйте `hasOwnProperty()` / `Object.hasOwn()`, когда:**
+- Нужны только собственные свойства объекта (обычно так!)
+- Итерируете по свойствам объекта
+- Проверяете данные объекта, а не методы
+
+### ⚠️ Проблема с `hasOwnProperty`
+
+Если объект создан с `Object.create(null)`, у него нет прототипа, и `hasOwnProperty` недоступен:
+
+```js
+const obj = Object.create(null);
+obj.name = "Alex";
+
+obj.hasOwnProperty("name");  // TypeError ❌ (метода нет!)
+
+// Решение 1: Object.hasOwn() (ES2022)
+Object.hasOwn(obj, "name");  // true ✅
+
+// Решение 2: call
+Object.prototype.hasOwnProperty.call(obj, "name");  // true ✅
+```
+
+### Современная альтернатива: `Object.hasOwn()`
+
+В ES2022 появился `Object.hasOwn()`, который решает проблему:
+
+```js
+const obj = { name: "Alex" };
+
+Object.hasOwn(obj, "name");      // true ✅
+Object.hasOwn(obj, "toString");  // false ✅
+
+// Работает даже с Object.create(null)
+const obj2 = Object.create(null);
+obj2.x = 1;
+Object.hasOwn(obj2, "x");  // true ✅
+```
+
+### Итоги
+
+- `in` — проверяет свойство во всей цепочке прототипов
+- `hasOwnProperty()` — только собственные свойства
+- `Object.hasOwn()` — современная альтернатива `hasOwnProperty()`
+- Обычно используют `hasOwnProperty()` / `Object.hasOwn()`
+
+---
+
+## 34. Итерация по объекту
+
+В JavaScript есть несколько способов перебрать свойства объекта. Каждый имеет свои особенности.
+
+### Способ 1: `for...in`
+
+Цикл `for...in` перебирает **все перечисляемые свойства**, включая унаследованные:
+
+```js
+const obj = { name: "Alex", age: 25 };
+
+for (let key in obj) {
+  console.log(key, obj[key]);
+}
+// name Alex
+// age 25
+```
+
+**⚠️ Важно:** перебирает и свойства прототипа! Используйте `hasOwnProperty()`:
+
+```js
+function Parent() {
+  this.parentProp = "parent";
+}
+
+function Child() {
+  this.childProp = "child";
+}
+Child.prototype = new Parent();
+
+const obj = new Child();
+
+for (let key in obj) {
+  console.log(key);  // childProp, parentProp (оба!)
+}
+
+// Только собственные свойства
+for (let key in obj) {
+  if (obj.hasOwnProperty(key)) {
+    console.log(key);  // только childProp
+  }
+}
+```
+
+### Способ 2: `Object.keys()`
+
+`Object.keys()` возвращает **массив ключей** только собственных перечисляемых свойств:
+
+```js
+const obj = { name: "Alex", age: 25 };
+
+Object.keys(obj);  // ["name", "age"]
+
+Object.keys(obj).forEach(key => {
+  console.log(key, obj[key]);
+});
+```
+
+**Преимущества:**
+- Только собственные свойства (не из прототипа)
+- Можно использовать методы массивов (`map`, `filter`)
+
+### Способ 3: `Object.values()`
+
+`Object.values()` возвращает **массив значений** собственных перечисляемых свойств:
+
+```js
+const obj = { name: "Alex", age: 25 };
+
+Object.values(obj);  // ["Alex", 25]
+
+Object.values(obj).forEach(value => {
+  console.log(value);
+});
+```
+
+### Способ 4: `Object.entries()`
+
+`Object.entries()` возвращает **массив пар [ключ, значение]**:
+
+```js
+const obj = { name: "Alex", age: 25 };
+
+Object.entries(obj);  // [["name", "Alex"], ["age", 25]]
+
+Object.entries(obj).forEach(([key, value]) => {
+  console.log(key, value);
+});
+
+// Преобразование в Map
+const map = new Map(Object.entries(obj));
+```
+
+### Сравнительная таблица
+
+| Метод | Что возвращает | Собственные свойства | Унаследованные |
+|-------|---------------|---------------------|----------------|
+| `for...in` | ключи (итерация) | ✅ | ✅ |
+| `Object.keys()` | массив ключей | ✅ | ❌ |
+| `Object.values()` | массив значений | ✅ | ❌ |
+| `Object.entries()` | массив [key, value] | ✅ | ❌ |
+
+### Примеры использования
+
+```js
+const user = { name: "Alex", age: 25, city: "Moscow" };
+
+// for...in
+for (let key in user) {
+  if (user.hasOwnProperty(key)) {
+    console.log(`${key}: ${user[key]}`);
+  }
+}
+
+// Object.keys() с map
+const keys = Object.keys(user);
+keys.map(key => `${key}: ${user[key]}`);
+
+// Object.entries() с деструктуризацией
+Object.entries(user).forEach(([key, value]) => {
+  console.log(`${key}: ${value}`);
+});
+
+// Фильтрация
+Object.entries(user)
+  .filter(([key, value]) => typeof value === "string")
+  .forEach(([key, value]) => console.log(key, value));
+```
+
+### Перечисляемые свойства
+
+Все эти методы работают только с **перечисляемыми свойствами**. Неперечисляемые свойства (например, `length` у массивов) не попадут в перебор:
+
+```js
+const arr = [1, 2, 3];
+
+Object.keys(arr);        // ["0", "1", "2"] (length не попадает)
+Object.getOwnPropertyNames(arr);  // ["0", "1", "2", "length"] (все свойства)
+```
+
+### Итоги
+
+- `for...in` — перебирает все свойства (включая прототип)
+- `Object.keys()` — массив ключей собственных свойств
+- `Object.values()` — массив значений
+- `Object.entries()` — массив пар [ключ, значение]
+- Обычно используют `Object.keys()` или `Object.entries()`
+
+---
+
+## 35. Почему `{}` !== `{}` и как сравниваются объекты
+
+Это один из самых частых вопросов на собеседованиях. Давайте разберёмся, почему объекты сравниваются именно так.
+
+### Объекты сравниваются по ссылке
+
+В JavaScript объекты сравниваются **по ссылке**, а не по содержимому:
+
+```js
+{} !== {}        // true (разные объекты в памяти)
+[] !== []        // true (разные массивы)
+```
+
+**Почему?** Каждый объект создаётся в **новом месте памяти**, даже если содержимое одинаковое.
+
+### Визуальная аналогия
+
+Представьте два одинаковых дома:
+- **Примитивы** (`5 === 5`) — сравниваем сами дома (значения)
+- **Объекты** (`{} !== {}`) — сравниваем адреса домов (ссылки), а не сами дома
+
+### Примеры
+
+```js
+const obj1 = { name: "Alex" };
+const obj2 = { name: "Alex" };
+
+obj1 === obj2;  // false ❌ (разные объекты)
+
+const obj3 = obj1;
+obj1 === obj3;  // true ✅ (один и тот же объект)
+
+obj1.name = "Bob";
+console.log(obj3.name);  // "Bob" (изменился, т.к. это тот же объект)
+```
+
+### Массивы тоже объекты
+
+```js
+[1, 2, 3] === [1, 2, 3];  // false ❌
+
+const arr1 = [1, 2, 3];
+const arr2 = arr1;
+arr1 === arr2;  // true ✅
+```
+
+### Функции тоже объекты
+
+```js
+function fn() {}
+function fn2() {}
+
+fn === fn2;  // false ❌
+
+const fn3 = fn;
+fn === fn3;  // true ✅
+```
+
+### Как сравнить объекты по содержимому?
+
+JavaScript **не имеет встроенного способа** глубокого сравнения объектов. Нужно сравнивать вручную:
+
+#### Простое сравнение (поверхностное)
+
+```js
+function shallowEqual(obj1, obj2) {
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+  
+  if (keys1.length !== keys2.length) {
+    return false;
+  }
+  
+  for (let key of keys1) {
+    if (obj1[key] !== obj2[key]) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+shallowEqual({ a: 1 }, { a: 1 });        // true ✅
+shallowEqual({ a: 1, b: { c: 2 } }, { a: 1, b: { c: 2 } });  // false ⚠️ (вложенные объекты!)
+```
+
+#### Глубокое сравнение (сложное)
+
+Для глубокого сравнения обычно используют библиотеки (например, Lodash):
+
+```js
+// С Lodash
+import _ from 'lodash';
+_.isEqual({ a: { b: 1 } }, { a: { b: 1 } });  // true
+```
+
+Или реализуют рекурсивную функцию (довольно сложно).
+
+### Сравнение примитивов
+
+Для сравнения всё работает как ожидается:
+
+```js
+5 === 5              // true ✅
+"hello" === "hello"  // true ✅
+true === true        // true ✅
+null === null        // true ✅
+undefined === undefined  // true ✅
+```
+
+### Почему так сделано?
+
+Сравнение по ссылке **быстрее**, чем сравнение по содержимому. Если бы объекты сравнивались по содержимому, пришлось бы проверять все свойства, включая вложенные.
+
+### ⚠️ Частая ошибка
+
+```js
+function createUser(name) {
+  return { name };
+}
+
+const user1 = createUser("Alex");
+const user2 = createUser("Alex");
+
+if (user1 === user2) {  // false ❌
+  console.log("Один пользователь");
+} else {
+  console.log("Разные пользователи");  // выполнится
+}
+
+// Правильно — сравнивать по значению
+if (user1.name === user2.name) {  // true ✅
+  console.log("Одинаковые имена");
+}
+```
+
+### Итоги
+
+- Объекты сравниваются по ссылке, а не по содержимому
+- `{} !== {}` потому что это разные объекты в памяти
+- Для сравнения по содержимому нужна специальная функция
+- Примитивы сравниваются по значению
+
+---
+
+## 36. Что такое прототип
+
+Прототип (prototype) — это **механизм наследования** в JavaScript. Каждый объект имеет ссылку на другой объект — свой прототип.
+
+### Простыми словами
+
+Прототип — это "запасной объект", где JavaScript ищет свойства, если их нет в самом объекте.
+
+### Как это работает?
+
+```js
+const obj = {};
+obj.toString();  // "[object Object]" — откуда взялся метод toString?
+
+// toString находится в прототипе Object.prototype
+```
+
+Когда вы обращаетесь к свойству объекта:
+1. JavaScript сначала ищет свойство **в самом объекте**
+2. Если не находит — идёт в **прототип объекта**
+3. Если не находит — идёт в прототип прототипа (цепочка прототипов)
+4. И так до `null`
+
+### Визуальная аналогия
+
+Представьте библиотеку:
+- **Объект** — ваша полка с книгами
+- **Прототип** — общая библиотека
+- Если книги нет на вашей полке, идёте в общую библиотеку
+
+### Пример с конструктором
+
+```js
+function User(name) {
+  this.name = name;
+}
+
+// Добавляем метод в прототип
+User.prototype.sayHi = function() {
+  console.log(`Привет, я ${this.name}`);
+};
+
+const user1 = new User("Alex");
+const user2 = new User("Bob");
+
+user1.sayHi();  // "Привет, я Alex"
+user2.sayHi();  // "Привет, я Bob"
+
+// Метод sayHi один для всех экземпляров!
+user1.sayHi === user2.sayHi;  // true ✅
+```
+
+**Почему методы в прототипе?** Чтобы все экземпляры использовали **один и тот же метод**, а не копию.
+
+### Доступ к прототипу
+
+```js
+const obj = {};
+
+// Старый способ (не рекомендуется)
+obj.__proto__  // Object.prototype
+
+// Современный способ
+Object.getPrototypeOf(obj);  // Object.prototype
+```
+
+### Установка прототипа
+
+```js
+const animal = { type: "animal" };
+const dog = { name: "Rex" };
+
+// Старый способ (не рекомендуется)
+dog.__proto__ = animal;
+
+// Современный способ
+Object.setPrototypeOf(dog, animal);
+
+// Или при создании
+const dog2 = Object.create(animal);
+dog2.name = "Rex";
+```
+
+### Зачем нужны прототипы?
+
+1. **Наследование** — объекты могут наследовать свойства и методы
+2. **Экономия памяти** — методы хранятся один раз, а не в каждом объекте
+3. **Динамичность** — можно добавлять методы в прототип, и все объекты их получат
+
+### Итоги
+
+- Прототип — механизм наследования в JavaScript
+- Если свойства нет в объекте, поиск идёт в прототипе
+- Методы обычно хранят в прототипе
+- Используйте `Object.getPrototypeOf()` вместо `__proto__`
+
+---
+
+## 37. `__proto__`, `[[Prototype]]`, `Object.getPrototypeOf`
+
+Это три способа работы с прототипом объекта. Давайте разберёмся в их различиях.
+
+### `[[Prototype]]` — внутреннее свойство
+
+`[[Prototype]]` — это **внутреннее (скрытое) свойство** объекта, которое хранит ссылку на прототип. К нему **нельзя обратиться напрямую** в коде.
+
+Это часть спецификации ECMAScript.
+
+### `__proto__` — устаревший способ доступа
+
+`__proto__` — это **геттер/сеттер** для доступа к `[[Prototype]]`. Это **устаревший способ**, который:
+
+- Работает, но не рекомендуется
+- Может быть медленнее
+- Не всегда доступен (например, `Object.create(null)`)
+
+```js
+const obj = {};
+
+obj.__proto__;                    // Object.prototype (устаревший способ)
+obj.__proto__ === Object.prototype;  // true
+```
+
+### `Object.getPrototypeOf()` — современный способ
+
+`Object.getPrototypeOf()` — **рекомендуемый способ** получить прототип:
+
+```js
+const obj = {};
+
+Object.getPrototypeOf(obj);                    // Object.prototype ✅
+Object.getPrototypeOf(obj) === Object.prototype;  // true ✅
+```
+
+**Преимущества:**
+- Работает везде
+- Более явный и понятный
+- Рекомендуется стандартом
+
+### Сравнение способов
+
+```js
+const obj = {};
+
+// Все три способа дают один результат
+obj.__proto__ === Object.getPrototypeOf(obj);  // true
+Object.getPrototypeOf(obj) === Object.prototype;  // true
+```
+
+### Установка прототипа
+
+#### `__proto__` (не рекомендуется)
+
+```js
+const parent = { x: 1 };
+const child = {};
+
+child.__proto__ = parent;  // ⚠️ устаревший способ
+console.log(child.x);      // 1
+```
+
+#### `Object.setPrototypeOf()` (рекомендуется)
+
+```js
+const parent = { x: 1 };
+const child = {};
+
+Object.setPrototypeOf(child, parent);  // ✅ современный способ
+console.log(child.x);  // 1
+```
+
+#### `Object.create()` (лучший способ при создании)
+
+```js
+const parent = { x: 1 };
+const child = Object.create(parent);  // ✅ создаёт объект с прототипом
+
+console.log(child.x);  // 1
+```
+
+### Когда что использовать?
+
+- **`[[Prototype]]`** — это внутреннее свойство, к нему нельзя обратиться
+- **`__proto__`** — избегайте, устаревший способ
+- **`Object.getPrototypeOf()`** — используйте для получения прототипа
+- **`Object.setPrototypeOf()`** — используйте для установки прототипа
+- **`Object.create()`** — используйте при создании объекта с прототипом
+
+### ⚠️ Важно
+
+Изменение прототипа **медленная операция** и может влиять на производительность:
+
+```js
+// Медленно ❌
+Object.setPrototypeOf(obj, newProto);
+
+// Быстро ✅
+const obj = Object.create(newProto);
+```
+
+### Итоги
+
+- `[[Prototype]]` — внутреннее свойство, недоступно напрямую
+- `__proto__` — устаревший способ доступа
+- `Object.getPrototypeOf()` — рекомендуемый способ получения прототипа
+- `Object.setPrototypeOf()` — для установки прототипа
+- `Object.create()` — лучший способ при создании объекта
+
+---
+
+## 38. Цепочка прототипов
+
+Цепочка прототипов (prototype chain) — это путь, по которому JavaScript ищет свойства объекта, переходя от объекта к прототипу, затем к прототипу прототипа и так далее.
+
+### Как это работает?
+
+Когда вы обращаетесь к свойству объекта, JavaScript:
+
+1. Ищет свойство **в самом объекте**
+2. Если не находит — идёт в **прототип объекта**
+3. Если не находит — идёт в **прототип прототипа**
+4. Продолжает до конца цепочки
+5. Если не находит — возвращает `undefined`
+
+### Пример цепочки
+
+```js
+function Animal(name) {
+  this.name = name;
+}
+
+Animal.prototype.eat = function() {
+  console.log(this.name + " ест");
+};
+
+function Dog(name, breed) {
+  Animal.call(this, name);
+  this.breed = breed;
+}
+
+Dog.prototype = Object.create(Animal.prototype);
+Dog.prototype.constructor = Dog;
+
+Dog.prototype.bark = function() {
+  console.log(this.name + " лает");
+};
+
+const rex = new Dog("Rex", "Labrador");
+
+// Цепочка прототипов:
+// rex → Dog.prototype → Animal.prototype → Object.prototype → null
+
+rex.bark();   // "Rex лает" (из Dog.prototype)
+rex.eat();    // "Rex ест" (из Animal.prototype)
+rex.toString();  // "[object Object]" (из Object.prototype)
+```
+
+### Визуализация цепочки
+
+```
+rex (объект)
+  ↓ __proto__
+Dog.prototype
+  ↓ __proto__
+Animal.prototype
+  ↓ __proto__
+Object.prototype
+  ↓ __proto__
+null
+```
+
+### Поиск свойства
+
+```js
+const obj = { x: 1 };
+
+// Поиск свойства y:
+// 1. obj — нет y
+// 2. Object.prototype — нет y
+// 3. null — конец цепочки
+// Результат: undefined
+
+console.log(obj.y);  // undefined
+```
+
+### Собственные vs унаследованные свойства
+
+```js
+function Parent() {
+  this.own = "собственное";
+}
+
+Parent.prototype.inherited = "унаследованное";
+
+const child = new Parent();
+
+console.log(child.own);        // "собственное" (своё свойство)
+console.log(child.inherited);  // "унаследованное" (из прототипа)
+
+child.hasOwnProperty("own");        // true ✅
+child.hasOwnProperty("inherited");  // false ✅ (из прототипа)
+```
+
+### Переопределение свойства
+
+Если свойство есть и в объекте, и в прототипе, используется **собственное**:
+
+```js
+function Parent() {}
+Parent.prototype.value = "прототип";
+
+const child = new Parent();
+child.value = "собственное";
+
+console.log(child.value);  // "собственное" (переопределило)
+```
+
+### Зачем нужна цепочка прототипов?
+
+1. **Наследование** — объекты наследуют свойства и методы
+2. **Экономия памяти** — методы хранятся один раз
+3. **Гибкость** — можно добавлять методы в прототип
+
+### Итоги
+
+- Цепочка прототипов — путь поиска свойств от объекта до null
+- JavaScript ищет свойства по цепочке снизу вверх
+- Собственные свойства имеют приоритет
+- Цепочка заканчивается на `null`
+
+---
+
+## 39. Что находится в конце цепочки прототипов
+
+В конце цепочки прототипов всегда находится **`null`**.
+
+### Структура цепочки
+
+Цепочка прототипов всегда заканчивается на `null`:
+
+```js
+const obj = {};
+
+// Цепочка:
+// obj → Object.prototype → null
+
+Object.getPrototypeOf(obj) === Object.prototype;  // true
+Object.getPrototypeOf(Object.prototype) === null;  // true ✅
+```
+
+### Проверка конца цепочки
+
+```js
+function getPrototypeChain(obj) {
+  const chain = [];
+  let current = obj;
+  
+  while (current !== null) {
+    chain.push(current);
+    current = Object.getPrototypeOf(current);
+  }
+  
+  return chain;
+}
+
+const obj = {};
+const chain = getPrototypeChain(obj);
+// [obj, Object.prototype]
+// null — конец цепочки
+```
+
+### Почему `null`?
+
+`null` используется как маркер **конца цепочки**. Когда JavaScript доходит до `null`, он понимает, что свойство не найдено, и возвращает `undefined`.
+
+### Пример для разных объектов
+
+```js
+// Обычный объект
+const obj = {};
+// obj → Object.prototype → null
+
+// Массив
+const arr = [];
+// arr → Array.prototype → Object.prototype → null
+
+// Функция
+function fn() {}
+// fn → Function.prototype → Object.prototype → null
+
+// Строка (при использовании как объект)
+const str = "hello";
+// str (примитив) → String.prototype → Object.prototype → null
+```
+
+### `Object.prototype` — последний реальный объект
+
+`Object.prototype` — это **последний объект** в цепочке, его прототип — `null`:
+
+```js
+Object.getPrototypeOf(Object.prototype);  // null ✅
+Object.prototype.__proto__;               // null ✅
+```
+
+### Что в `Object.prototype`?
+
+`Object.prototype` содержит базовые методы для всех объектов:
+
+```js
+Object.prototype.toString;    // метод toString
+Object.prototype.valueOf;     // метод valueOf
+Object.prototype.hasOwnProperty;  // метод hasOwnProperty
+// и другие...
+```
+
+### Итоги
+
+- В конце цепочки прототипов всегда `null`
+- `Object.prototype` — последний объект (его прототип — `null`)
+- `null` — маркер конца цепочки
+- Когда JavaScript доходит до `null`, возвращает `undefined`
+
+---
+
+## 40. Поверхностное и глубокое копирование
+
+При копировании объектов важно понимать разницу между поверхностным и глубоким копированием.
+
+### Поверхностное копирование (Shallow Copy)
+
+Поверхностное копирование создаёт новый объект и копирует только **первый уровень** свойств. Вложенные объекты **не копируются**, а передаются по ссылке.
+
+```js
+const original = {
+  name: "Alex",
+  age: 25,
+  address: {
+    city: "Moscow",
+    street: "Lenin St"
+  }
+};
+
+// Поверхностная копия
+const shallow = Object.assign({}, original);
+// или
+const shallow2 = { ...original };
+
+shallow.name = "Bob";
+shallow.address.city = "SPB";
+
+console.log(original.name);        // "Alex" ✅ (не изменилось)
+console.log(original.address.city);  // "SPB" ⚠️ (изменилось!)
+```
+
+**Проблема:** изменения во вложенных объектах влияют на оригинал.
+
+### Глубокое копирование (Deep Copy)
+
+Глубокое копирование создаёт **полностью независимую копию** со всеми вложенными объектами.
+
+```js
+const original = {
+  name: "Alex",
+  address: {
+    city: "Moscow"
+  }
+};
+
+// Глубокая копия
+const deep = structuredClone(original);  // современный способ
+
+deep.address.city = "SPB";
+
+console.log(original.address.city);  // "Moscow" ✅ (не изменилось!)
+console.log(deep.address.city);      // "SPB" ✅
+```
+
+### Визуальная аналогия
+
+- **Поверхностное** — как ксерокопия первой страницы документа, остальные страницы — ссылки на оригинал
+- **Глубокое** — как полная ксерокопия всего документа со всеми страницами
+
+### Способы поверхностного копирования
+
+```js
+const obj = { a: 1, b: { c: 2 } };
+
+// 1. Object.assign
+const copy1 = Object.assign({}, obj);
+
+// 2. Spread operator
+const copy2 = { ...obj };
+
+// 3. Array.from (для массивов)
+const arr = [1, 2, { x: 3 }];
+const copy3 = Array.from(arr);
+// или
+const copy4 = [...arr];
+```
+
+### Способы глубокого копирования
+
+#### 1. `structuredClone()` (ES2022, рекомендуемый)
+
+```js
+const obj = { a: 1, b: { c: 2 } };
+const deep = structuredClone(obj);
+```
+
+**Преимущества:**
+- Простой синтаксис
+- Копирует большинство типов данных
+- Работает с циклическими ссылками
+
+**Ограничения:**
+- Не копирует функции
+- Не копирует Symbol
+
+#### 2. `JSON.parse(JSON.stringify())`
+
+```js
+const obj = { a: 1, b: { c: 2 } };
+const deep = JSON.parse(JSON.stringify(obj));
+```
+
+**Ограничения:**
+- Не копирует функции
+- Не копирует `undefined`
+- Не копирует Symbol
+- Не копирует Date (превращает в строку)
+- Не работает с циклическими ссылками
+
+#### 3. Рекурсивная функция (для сложных случаев)
+
+```js
+function deepClone(obj) {
+  if (obj === null || typeof obj !== "object") {
+    return obj;
+  }
+  
+  if (obj instanceof Date) {
+    return new Date(obj);
+  }
+  
+  if (obj instanceof Array) {
+    return obj.map(item => deepClone(item));
+  }
+  
+  const cloned = {};
+  for (let key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      cloned[key] = deepClone(obj[key]);
+    }
+  }
+  
+  return cloned;
+}
+```
+
+### Когда что использовать?
+
+- **Поверхностное копирование** — когда нет вложенных объектов или они не должны изменяться
+- **Глубокое копирование** — когда нужна полностью независимая копия со всеми вложенными объектами
+
+### ⚠️ Частая ошибка
+
+```js
+const original = { a: 1, b: { c: 2 } };
+
+// Кажется, что это глубокая копия, но это поверхностная!
+const copy = { ...original };
+copy.b.c = 3;
+
+console.log(original.b.c);  // 3 ⚠️ (изменился!)
+```
+
+### Итоги
+
+- Поверхностное копирование — только первый уровень, вложенные объекты по ссылке
+- Глубокое копирование — полностью независимая копия
+- Используйте `structuredClone()` для глубокого копирования
+- Spread и Object.assign — поверхностное копирование
+
+---
+
+
