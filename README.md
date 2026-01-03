@@ -4576,4 +4576,1456 @@ console.log(original.b.c);  // 3 ⚠️ (изменился!)
 
 ---
 
+## 41. Способы копирования объектов
 
+В JavaScript есть несколько способов копирования объектов. Выбор зависит от того, нужна ли вам поверхностная или глубокая копия.
+
+### Поверхностное копирование
+
+#### 1. Spread operator (`...`)
+
+Самый популярный и читаемый способ:
+
+```js
+const obj = { name: "Alex", age: 25 };
+const copy = { ...obj };
+
+copy.name = "Bob";
+console.log(obj.name);  // "Alex" ✅ (не изменилось)
+```
+
+#### 2. `Object.assign()`
+
+Создаёт поверхностную копию:
+
+```js
+const obj = { name: "Alex", age: 25 };
+const copy = Object.assign({}, obj);
+
+// Можно объединить несколько объектов
+const merged = Object.assign({}, obj1, obj2, obj3);
+```
+
+#### 3. `Array.from()` / Spread для массивов
+
+```js
+const arr = [1, 2, 3];
+const copy1 = Array.from(arr);
+const copy2 = [...arr];
+```
+
+### Глубокое копирование
+
+#### 1. `structuredClone()` (ES2022, рекомендуемый)
+
+```js
+const obj = { a: 1, b: { c: 2 } };
+const deep = structuredClone(obj);
+```
+
+#### 2. `JSON.parse(JSON.stringify())`
+
+```js
+const obj = { a: 1, b: { c: 2 } };
+const deep = JSON.parse(JSON.stringify(obj));
+```
+
+**⚠️ Ограничения:** не копирует функции, `undefined`, Symbol, Date (см. тему 43).
+
+#### 3. Рекурсивная функция
+
+Для сложных случаев с функциями и другими типами данных.
+
+### Сравнительная таблица
+
+| Способ | Тип копирования | Скорость | Ограничения |
+|--------|----------------|----------|-------------|
+| `{ ...obj }` | Поверхностная | Быстро | Вложенные объекты по ссылке |
+| `Object.assign()` | Поверхностная | Быстро | Вложенные объекты по ссылке |
+| `structuredClone()` | Глубокая | Средне | Не копирует функции, Symbol |
+| `JSON.parse(JSON.stringify())` | Глубокая | Медленно | Много ограничений (см. тему 43) |
+
+### Когда что использовать?
+
+- **Spread / Object.assign** — когда нет вложенных объектов или они не должны изменяться
+- **structuredClone()** — когда нужна глубокая копия (большинство случаев)
+- **JSON способ** — только для простых данных без функций
+
+### Итоги
+
+- Поверхностное: spread, Object.assign
+- Глубокое: structuredClone(), JSON способ
+- Выбор зависит от структуры данных
+
+---
+
+## 42. Как сделать глубокую копию объекта
+
+Глубокая копия нужна, когда нужно создать полностью независимую копию объекта со всеми вложенными объектами.
+
+### Способ 1: `structuredClone()` (рекомендуемый, ES2022)
+
+Самый простой и современный способ:
+
+```js
+const original = {
+  name: "Alex",
+  address: {
+    city: "Moscow",
+    street: "Lenin St"
+  },
+  hobbies: ["reading", "coding"]
+};
+
+const deep = structuredClone(original);
+
+deep.address.city = "SPB";
+deep.hobbies.push("gaming");
+
+console.log(original.address.city);  // "Moscow" ✅
+console.log(original.hobbies);       // ["reading", "coding"] ✅
+```
+
+**Что копирует:**
+- Объекты и массивы
+- Примитивы
+- Date (как Date объект)
+- RegExp
+- Map, Set
+- Циклические ссылки
+
+**Что НЕ копирует:**
+- Функции
+- Symbol
+
+### Способ 2: `JSON.parse(JSON.stringify())`
+
+Работает, но с ограничениями:
+
+```js
+const original = { a: 1, b: { c: 2 } };
+const deep = JSON.parse(JSON.stringify(original));
+```
+
+**Проблемы:**
+- Функции теряются
+- `undefined` теряется
+- Symbol теряется
+- Date превращается в строку
+- Не работает с циклическими ссылками
+
+### Способ 3: Рекурсивная функция
+
+Для случаев, когда нужны функции или другие особые типы:
+
+```js
+function deepClone(obj) {
+  // Примитивы и null
+  if (obj === null || typeof obj !== "object") {
+    return obj;
+  }
+  
+  // Date
+  if (obj instanceof Date) {
+    return new Date(obj.getTime());
+  }
+  
+  // Массивы
+  if (Array.isArray(obj)) {
+    return obj.map(item => deepClone(item));
+  }
+  
+  // Объекты
+  const cloned = {};
+  for (let key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      cloned[key] = deepClone(obj[key]);
+    }
+  }
+  
+  return cloned;
+}
+
+const original = {
+  name: "Alex",
+  date: new Date(),
+  arr: [1, { x: 2 }]
+};
+
+const deep = deepClone(original);
+```
+
+### Способ 4: Библиотеки (Lodash)
+
+Для продакшена часто используют библиотеки:
+
+```js
+import _ from 'lodash';
+
+const deep = _.cloneDeep(original);
+```
+
+### Сравнение способов
+
+```js
+const obj = {
+  a: 1,
+  b: { c: 2 },
+  fn: function() {},
+  date: new Date(),
+  sym: Symbol("test"),
+  undef: undefined
+};
+
+// structuredClone
+const clone1 = structuredClone(obj);
+// Результат: a, b, date ✅ (но нет fn, sym, undef)
+
+// JSON способ
+const clone2 = JSON.parse(JSON.stringify(obj));
+// Результат: только a, b ✅ (date → строка, остальное потеряно)
+
+// Рекурсивная функция
+const clone3 = deepClone(obj);
+// Результат: все кроме Symbol (нужно добавить обработку)
+```
+
+### ⚠️ Частая ошибка
+
+Попытка сделать глубокую копию через spread:
+
+```js
+const original = { a: { b: 1 } };
+const copy = { ...original };  // поверхностная копия!
+
+copy.a.b = 2;
+console.log(original.a.b);  // 2 ⚠️ (изменилось!)
+```
+
+### Итоги
+
+- `structuredClone()` — лучший современный способ
+- JSON способ — только для простых данных
+- Рекурсивная функция — для особых случаев
+- Библиотеки — для сложных проектов
+
+---
+
+## 43. Ограничения `JSON.parse(JSON.stringify())`
+
+Метод `JSON.parse(JSON.stringify())` — простой способ глубокого копирования, но у него много ограничений. Важно их знать!
+
+### Что работает
+
+```js
+const obj = {
+  name: "Alex",
+  age: 25,
+  nested: { x: 1 },
+  arr: [1, 2, 3]
+};
+
+const copy = JSON.parse(JSON.stringify(obj));
+// ✅ Копирует: объекты, массивы, примитивы (string, number, boolean, null)
+```
+
+### Ограничение 1: Функции теряются
+
+```js
+const obj = {
+  name: "Alex",
+  greet: function() {
+    return "Hello";
+  }
+};
+
+const copy = JSON.parse(JSON.stringify(obj));
+console.log(copy.greet);  // undefined ❌ (функция потеряна!)
+```
+
+### Ограничение 2: `undefined` теряется
+
+```js
+const obj = {
+  name: "Alex",
+  age: undefined
+};
+
+const copy = JSON.parse(JSON.stringify(obj));
+console.log(copy.age);  // undefined (но свойство отсутствует!)
+console.log("age" in copy);  // false ❌ (свойство удалено!)
+```
+
+### Ограничение 3: Symbol теряется
+
+```js
+const sym = Symbol("test");
+const obj = {
+  name: "Alex",
+  [sym]: "value"
+};
+
+const copy = JSON.parse(JSON.stringify(obj));
+console.log(copy[sym]);  // undefined ❌ (Symbol потерян!)
+```
+
+### Ограничение 4: Date превращается в строку
+
+```js
+const obj = {
+  name: "Alex",
+  date: new Date()
+};
+
+const copy = JSON.parse(JSON.stringify(obj));
+console.log(copy.date);  // "2024-01-01T00:00:00.000Z" ❌ (строка, не Date!)
+console.log(copy.date instanceof Date);  // false
+```
+
+### Ограничение 5: Циклические ссылки вызывают ошибку
+
+```js
+const obj = { name: "Alex" };
+obj.self = obj;  // циклическая ссылка
+
+JSON.parse(JSON.stringify(obj));  // TypeError ❌ (не может сериализовать!)
+```
+
+### Ограничение 6: `NaN`, `Infinity`, `-Infinity` превращаются в `null`
+
+```js
+const obj = {
+  a: NaN,
+  b: Infinity,
+  c: -Infinity
+};
+
+const copy = JSON.parse(JSON.stringify(obj));
+console.log(copy.a);  // null ❌
+console.log(copy.b);  // null ❌
+console.log(copy.c);  // null ❌
+```
+
+### Ограничение 7: Map и Set теряются
+
+```js
+const obj = {
+  map: new Map([["key", "value"]]),
+  set: new Set([1, 2, 3])
+};
+
+const copy = JSON.parse(JSON.stringify(obj));
+console.log(copy.map);  // {} ❌ (пустой объект)
+console.log(copy.set);  // {} ❌ (пустой объект)
+```
+
+### Когда использовать?
+
+Используйте `JSON.parse(JSON.stringify())` только если:
+- ✅ Нет функций
+- ✅ Нет `undefined` (или не важно)
+- ✅ Нет Symbol
+- ✅ Нет Date (или можно преобразовать)
+- ✅ Нет циклических ссылок
+- ✅ Только простые данные (объекты, массивы, примитивы)
+
+### Альтернатива: `structuredClone()`
+
+Для большинства случаев лучше использовать `structuredClone()`:
+
+```js
+const obj = {
+  date: new Date(),
+  map: new Map([["key", "value"]]),
+  nested: { x: 1 }
+};
+
+const copy = structuredClone(obj);  // ✅ Работает лучше!
+```
+
+### Итоги
+
+- `JSON.parse(JSON.stringify())` имеет много ограничений
+- Не работает с функциями, `undefined`, Symbol, Date, циклическими ссылками
+- Используйте только для простых данных
+- Для сложных случаев — `structuredClone()` или библиотеки
+
+---
+
+## 44. Какие типы данных теряются при `JSON.stringify`
+
+`JSON.stringify()` может сериализовать только ограниченный набор типов данных. Всё остальное теряется или преобразуется.
+
+### Что сохраняется
+
+```js
+const obj = {
+  string: "text",
+  number: 42,
+  boolean: true,
+  null: null,
+  array: [1, 2, 3],
+  object: { nested: "value" }
+};
+
+JSON.stringify(obj);
+// ✅ Все эти типы сохраняются
+```
+
+### Что теряется или преобразуется
+
+#### 1. `undefined` — полностью удаляется
+
+```js
+const obj = { a: 1, b: undefined };
+JSON.stringify(obj);  // '{"a":1}' ❌ (b удалено!)
+```
+
+#### 2. Функции — удаляются
+
+```js
+const obj = { a: 1, fn: function() {} };
+JSON.stringify(obj);  // '{"a":1}' ❌ (fn удалено!)
+```
+
+#### 3. Symbol — удаляется
+
+```js
+const sym = Symbol("test");
+const obj = { a: 1, [sym]: "value" };
+JSON.stringify(obj);  // '{"a":1}' ❌ (Symbol удалён!)
+```
+
+#### 4. Date — превращается в строку
+
+```js
+const obj = { date: new Date() };
+JSON.stringify(obj);
+// '{"date":"2024-01-01T00:00:00.000Z"}' ❌ (строка, не Date!)
+```
+
+#### 5. `NaN`, `Infinity`, `-Infinity` — превращаются в `null`
+
+```js
+const obj = { a: NaN, b: Infinity, c: -Infinity };
+JSON.stringify(obj);
+// '{"a":null,"b":null,"c":null}' ❌
+```
+
+#### 6. Map, Set — становятся пустыми объектами
+
+```js
+const obj = {
+  map: new Map([["key", "value"]]),
+  set: new Set([1, 2, 3])
+};
+
+JSON.stringify(obj);
+// '{"map":{},"set":{}}' ❌ (пустые объекты!)
+```
+
+#### 7. RegExp — становится пустым объектом
+
+```js
+const obj = { regex: /test/gi };
+JSON.stringify(obj);
+// '{"regex":{}}' ❌
+```
+
+#### 8. Циклические ссылки — ошибка
+
+```js
+const obj = { name: "Alex" };
+obj.self = obj;
+
+JSON.stringify(obj);  // TypeError ❌ (не может сериализовать!)
+```
+
+### Таблица потери данных
+
+| Тип данных | Что происходит |
+|-----------|----------------|
+| `string`, `number`, `boolean` | ✅ Сохраняется |
+| `null` | ✅ Сохраняется |
+| `Array`, `Object` | ✅ Сохраняется |
+| `undefined` | ❌ Удаляется |
+| `Function` | ❌ Удаляется |
+| `Symbol` | ❌ Удаляется |
+| `Date` | ❌ Превращается в строку |
+| `NaN`, `Infinity` | ❌ Превращается в `null` |
+| `Map`, `Set` | ❌ Пустой объект `{}` |
+| `RegExp` | ❌ Пустой объект `{}` |
+| Циклические ссылки | ❌ Ошибка |
+
+### Как сохранить Date?
+
+Можно использовать `replacer` функцию:
+
+```js
+const obj = { date: new Date() };
+
+JSON.stringify(obj, (key, value) => {
+  if (value instanceof Date) {
+    return value.toISOString();  // или value.getTime()
+  }
+  return value;
+});
+```
+
+Но при `JSON.parse()` это всё равно будет строка, не Date.
+
+### Итоги
+
+- `JSON.stringify()` сохраняет только: объекты, массивы, примитивы
+- Теряет: функции, `undefined`, Symbol
+- Преобразует: Date → строка, NaN/Infinity → null, Map/Set → {}
+- Для сохранения всех типов используйте `structuredClone()` или библиотеки
+
+---
+
+## 45. Мутация и иммутабельность
+
+Мутация и иммутабельность — важные концепции в программировании, особенно в функциональном программировании и современных фреймворках.
+
+### Что такое мутация?
+
+**Мутация** (mutation) — это изменение существующего объекта или массива.
+
+```js
+const obj = { name: "Alex" };
+obj.name = "Bob";  // мутация — изменён существующий объект
+
+const arr = [1, 2, 3];
+arr.push(4);  // мутация — изменён существующий массив
+```
+
+### Что такое иммутабельность?
+
+**Иммутабельность** (immutability) — создание нового объекта/массива вместо изменения существующего.
+
+```js
+const obj = { name: "Alex" };
+const newObj = { ...obj, name: "Bob" };  // новый объект
+
+const arr = [1, 2, 3];
+const newArr = [...arr, 4];  // новый массив
+```
+
+### Примитивы — неизменяемы
+
+Примитивы в JavaScript **всегда неизменяемы**:
+
+```js
+let str = "hello";
+str.toUpperCase();  // создаёт новую строку
+console.log(str);   // "hello" ✅ (не изменилась)
+
+let num = 5;
+num = 6;  // это не мутация! Переменная получила новое значение
+```
+
+### Объекты и массивы — изменяемы
+
+Объекты и массивы **изменяемы по умолчанию**:
+
+```js
+const obj = { count: 0 };
+obj.count = 1;  // мутация ✅
+
+const arr = [1, 2];
+arr.push(3);  // мутация ✅
+```
+
+### Почему важна иммутабельность?
+
+1. **Предсказуемость** — данные не изменяются неожиданно
+2. **Отладка** — проще отслеживать изменения
+3. **Реактивность** — фреймворки (React, Vue) отслеживают изменения через сравнение ссылок
+4. **Параллелизм** — безопасность при многопоточности
+
+### Пример проблемы с мутацией
+
+```js
+const original = { name: "Alex", age: 25 };
+const copy = original;  // копия ссылки
+
+copy.age = 30;  // мутация
+console.log(original.age);  // 30 ⚠️ (изменился оригинал!)
+```
+
+### Иммутабельное обновление
+
+```js
+const original = { name: "Alex", age: 25 };
+const updated = { ...original, age: 30 };  // новый объект
+
+console.log(original.age);  // 25 ✅ (не изменился)
+console.log(updated.age);   // 30 ✅
+```
+
+### Иммутабельная работа с массивами
+
+#### Вместо мутации:
+
+```js
+// ❌ Мутация
+const arr = [1, 2, 3];
+arr.push(4);
+arr.pop();
+arr.sort();
+
+// ✅ Иммутабельно
+const arr = [1, 2, 3];
+const withFour = [...arr, 4];  // новый массив
+const withoutLast = arr.slice(0, -1);  // новый массив
+const sorted = [...arr].sort();  // новый массив
+```
+
+### Иммутабельные методы массивов
+
+Методы, которые **не изменяют** исходный массив (возвращают новый):
+
+```js
+const arr = [1, 2, 3];
+
+arr.map(x => x * 2);      // [2, 4, 6] ✅ (новый массив)
+arr.filter(x => x > 1);   // [2, 3] ✅ (новый массив)
+arr.slice(0, 2);          // [1, 2] ✅ (новый массив)
+arr.concat([4]);          // [1, 2, 3, 4] ✅ (новый массив)
+```
+
+### Мутирующие методы массивов
+
+Методы, которые **изменяют** исходный массив:
+
+```js
+const arr = [1, 2, 3];
+
+arr.push(4);    // изменяет arr ❌
+arr.pop();      // изменяет arr ❌
+arr.sort();     // изменяет arr ❌
+arr.reverse();  // изменяет arr ❌
+```
+
+### Итоги
+
+- Мутация — изменение существующего объекта/массива
+- Иммутабельность — создание нового объекта/массива
+- Примитивы неизменяемы, объекты изменяемы
+- Иммутабельность делает код предсказуемее
+- Используйте spread и немутирующие методы для иммутабельности
+
+---
+
+## 46. Методы массивов `map`, `filter`, `reduce`
+
+Три самых важных метода массивов в JavaScript. Они не изменяют исходный массив и очень часто используются.
+
+### `map` — преобразование элементов
+
+`map` создаёт **новый массив**, применяя функцию к каждому элементу:
+
+```js
+const numbers = [1, 2, 3, 4];
+const doubled = numbers.map(n => n * 2);
+// [2, 4, 6, 8] ✅ (новый массив)
+
+console.log(numbers);  // [1, 2, 3, 4] (исходный не изменился)
+```
+
+**Синтаксис:**
+```js
+array.map((element, index, array) => {
+  // возвращает новое значение для элемента
+});
+```
+
+**Примеры:**
+```js
+// Преобразование объектов
+const users = [
+  { name: "Alex", age: 25 },
+  { name: "Bob", age: 30 }
+];
+
+const names = users.map(user => user.name);
+// ["Alex", "Bob"]
+
+// Преобразование типов
+const strings = ["1", "2", "3"];
+const numbers = strings.map(str => Number(str));
+// [1, 2, 3]
+```
+
+### `filter` — фильтрация элементов
+
+`filter` создаёт **новый массив** с элементами, прошедшими проверку:
+
+```js
+const numbers = [1, 2, 3, 4, 5];
+const even = numbers.filter(n => n % 2 === 0);
+// [2, 4] ✅ (только чётные)
+
+console.log(numbers);  // [1, 2, 3, 4, 5] (исходный не изменился)
+```
+
+**Синтаксис:**
+```js
+array.filter((element, index, array) => {
+  // возвращает true/false
+  // true — элемент остаётся, false — убирается
+});
+```
+
+**Примеры:**
+```js
+// Фильтрация по условию
+const users = [
+  { name: "Alex", age: 25 },
+  { name: "Bob", age: 30 },
+  { name: "Charlie", age: 20 }
+];
+
+const adults = users.filter(user => user.age >= 25);
+// [{ name: "Alex", age: 25 }, { name: "Bob", age: 30 }]
+
+// Удаление undefined/null
+const values = [1, null, 2, undefined, 3];
+const clean = values.filter(v => v != null);
+// [1, 2, 3]
+```
+
+### `reduce` — свёртка массива в одно значение
+
+`reduce` **сводит массив к одному значению**, применяя функцию к каждому элементу:
+
+```js
+const numbers = [1, 2, 3, 4];
+const sum = numbers.reduce((acc, n) => acc + n, 0);
+// 10 ✅
+
+// Пошагово:
+// acc = 0, n = 1 → acc = 1
+// acc = 1, n = 2 → acc = 3
+// acc = 3, n = 3 → acc = 6
+// acc = 6, n = 4 → acc = 10
+```
+
+**Синтаксис:**
+```js
+array.reduce((accumulator, element, index, array) => {
+  // возвращает новое значение аккумулятора
+}, initialValue);
+```
+
+**Важно:** если не указать начальное значение, берётся первый элемент (может привести к ошибкам!).
+
+**Примеры:**
+```js
+// Сумма
+const sum = [1, 2, 3].reduce((acc, n) => acc + n, 0);  // 6
+
+// Произведение
+const product = [2, 3, 4].reduce((acc, n) => acc * n, 1);  // 24
+
+// Максимум
+const max = [5, 2, 8, 1].reduce((acc, n) => n > acc ? n : acc, -Infinity);  // 8
+
+// Группировка
+const items = [
+  { type: "fruit", name: "apple" },
+  { type: "fruit", name: "banana" },
+  { type: "vegetable", name: "carrot" }
+];
+
+const grouped = items.reduce((acc, item) => {
+  if (!acc[item.type]) {
+    acc[item.type] = [];
+  }
+  acc[item.type].push(item.name);
+  return acc;
+}, {});
+// { fruit: ["apple", "banana"], vegetable: ["carrot"] }
+```
+
+### Цепочки методов
+
+Методы можно объединять в цепочки:
+
+```js
+const numbers = [1, 2, 3, 4, 5, 6];
+
+const result = numbers
+  .filter(n => n % 2 === 0)  // [2, 4, 6]
+  .map(n => n * 2)            // [4, 8, 12]
+  .reduce((acc, n) => acc + n, 0);  // 24
+```
+
+### Сравнение методов
+
+| Метод | Что возвращает | Изменяет исходный? |
+|-------|---------------|-------------------|
+| `map` | Новый массив (та же длина) | ❌ Нет |
+| `filter` | Новый массив (меньше или равно) | ❌ Нет |
+| `reduce` | Одно значение | ❌ Нет |
+
+### ⚠️ Частая ошибка с `reduce`
+
+Забывают начальное значение:
+
+```js
+const numbers = [1, 2, 3];
+
+// Без начального значения (работает, но рискованно)
+const sum1 = numbers.reduce((acc, n) => acc + n);  // 6
+
+// С начальным значением (правильно)
+const sum2 = numbers.reduce((acc, n) => acc + n, 0);  // 6 ✅
+
+// Проблема с пустым массивом
+[].reduce((acc, n) => acc + n);  // TypeError ❌
+[].reduce((acc, n) => acc + n, 0);  // 0 ✅
+```
+
+### Итоги
+
+- `map` — преобразует каждый элемент (новая длина = старая)
+- `filter` — отбирает элементы по условию (новая длина ≤ старая)
+- `reduce` — сводит массив к одному значению
+- Все три метода не изменяют исходный массив
+- Можно объединять в цепочки
+
+---
+
+## 47. Разница между `map` и `forEach`
+
+`map` и `forEach` похожи, но имеют важные отличия. Часто их путают новички.
+
+### `map` — возвращает новый массив
+
+`map` **возвращает новый массив** с преобразованными элементами:
+
+```js
+const numbers = [1, 2, 3];
+const doubled = numbers.map(n => n * 2);
+
+console.log(doubled);  // [2, 4, 6] ✅ (новый массив)
+console.log(numbers);  // [1, 2, 3] (исходный не изменился)
+```
+
+### `forEach` — ничего не возвращает
+
+`forEach` **не возвращает значение** (возвращает `undefined`):
+
+```js
+const numbers = [1, 2, 3];
+const result = numbers.forEach(n => n * 2);
+
+console.log(result);  // undefined ❌
+```
+
+### Когда использовать `map`?
+
+Используйте `map`, когда нужно:
+- ✅ Преобразовать массив
+- ✅ Получить новый массив с результатами
+- ✅ Объединить в цепочку методов
+
+```js
+const users = [{ name: "Alex" }, { name: "Bob" }];
+
+const names = users.map(user => user.name);
+// ["Alex", "Bob"]
+
+// В цепочке
+users
+  .map(user => user.name)
+  .filter(name => name.length > 3)
+  .map(name => name.toUpperCase());
+```
+
+### Когда использовать `forEach`?
+
+Используйте `forEach`, когда нужно:
+- ✅ Выполнить действие для каждого элемента
+- ✅ Вывести в консоль
+- ✅ Изменить внешние переменные
+- ✅ Вызвать функцию с побочными эффектами
+
+```js
+const numbers = [1, 2, 3];
+
+// Вывод в консоль
+numbers.forEach(n => console.log(n));
+
+// Изменение внешней переменной
+let sum = 0;
+numbers.forEach(n => {
+  sum += n;
+});
+console.log(sum);  // 6
+
+// Побочные эффекты
+numbers.forEach(n => {
+  updateDatabase(n);  // действие с побочным эффектом
+});
+```
+
+### Сравнительная таблица
+
+| Особенность | `map` | `forEach` |
+|-------------|-------|-----------|
+| Возвращает значение | ✅ Новый массив | ❌ `undefined` |
+| Изменяет исходный массив | ❌ Нет | ❌ Нет |
+| Использование | Преобразование | Действия/побочные эффекты |
+| Можно объединять в цепочки | ✅ Да | ❌ Нет |
+
+### ⚠️ Частая ошибка
+
+Попытка использовать `forEach` для преобразования:
+
+```js
+const numbers = [1, 2, 3];
+
+// Неправильно
+const doubled = numbers.forEach(n => n * 2);
+console.log(doubled);  // undefined ❌
+
+// Правильно
+const doubled = numbers.map(n => n * 2);
+console.log(doubled);  // [2, 4, 6] ✅
+```
+
+### Можно ли использовать `map` для побочных эффектов?
+
+Технически да, но **не рекомендуется**:
+
+```js
+// Плохо ❌ (map для побочных эффектов)
+numbers.map(n => console.log(n));
+
+// Хорошо ✅ (forEach для побочных эффектов)
+numbers.forEach(n => console.log(n));
+```
+
+**Почему?** `map` предназначен для преобразования, использование для побочных эффектов запутывает код.
+
+### Производительность
+
+`map` и `forEach` имеют **одинаковую производительность**. Разница незначительна.
+
+### Итоги
+
+- `map` — возвращает новый массив (для преобразования)
+- `forEach` — ничего не возвращает (для действий)
+- `map` — для получения нового массива
+- `forEach` — для побочных эффектов
+- Не путайте их назначение!
+
+---
+
+## 48. Методы массива `find`, `some`, `every`
+
+Эти три метода помогают проверять элементы массива и находить нужные значения.
+
+### `find` — находит первый элемент
+
+`find` возвращает **первый элемент**, который соответствует условию:
+
+```js
+const users = [
+  { id: 1, name: "Alex", age: 25 },
+  { id: 2, name: "Bob", age: 30 },
+  { id: 3, name: "Charlie", age: 25 }
+];
+
+const user = users.find(u => u.age === 25);
+// { id: 1, name: "Alex", age: 25 } ✅ (первый найденный)
+
+const notFound = users.find(u => u.age > 100);
+// undefined ✅ (не найдено)
+```
+
+**Синтаксис:**
+```js
+array.find((element, index, array) => {
+  // возвращает true/false
+  // true — элемент найден, возвращается element
+});
+```
+
+### `some` — проверяет, есть ли хотя бы один
+
+`some` возвращает `true`, если **хотя бы один элемент** соответствует условию:
+
+```js
+const numbers = [1, 2, 3, 4, 5];
+
+numbers.some(n => n > 3);  // true ✅ (есть элементы > 3)
+numbers.some(n => n > 10); // false ✅ (нет элементов > 10)
+```
+
+**Синтаксис:**
+```js
+array.some((element, index, array) => {
+  // возвращает true/false
+});
+```
+
+**Примеры:**
+```js
+const users = [
+  { name: "Alex", active: true },
+  { name: "Bob", active: false },
+  { name: "Charlie", active: false }
+];
+
+const hasActive = users.some(u => u.active);
+// true ✅ (есть хотя бы один активный)
+
+// Проверка на наличие
+const hasAdmin = users.some(u => u.role === "admin");
+```
+
+### `every` — проверяет, все ли соответствуют
+
+`every` возвращает `true`, если **все элементы** соответствуют условию:
+
+```js
+const numbers = [2, 4, 6, 8];
+
+numbers.every(n => n % 2 === 0);  // true ✅ (все чётные)
+numbers.every(n => n > 5);        // false ✅ (не все > 5)
+```
+
+**Синтаксис:**
+```js
+array.every((element, index, array) => {
+  // возвращает true/false
+});
+```
+
+**Примеры:**
+```js
+const users = [
+  { age: 25 },
+  { age: 30 },
+  { age: 28 }
+];
+
+const allAdults = users.every(u => u.age >= 18);
+// true ✅ (всем есть 18+)
+
+// Валидация формы
+const fields = ["name", "email", "password"];
+const allFilled = fields.every(field => form[field].length > 0);
+```
+
+### Сравнительная таблица
+
+| Метод | Что возвращает | Когда возвращает `true` |
+|-------|---------------|------------------------|
+| `find` | Элемент или `undefined` | Когда находит первый подходящий |
+| `some` | `true` или `false` | Когда хотя бы один подходит |
+| `every` | `true` или `false` | Когда все подходят |
+
+### Особенности
+
+#### Пустой массив
+
+```js
+[].some(() => true);   // false ✅ (нет элементов для проверки)
+[].every(() => true);  // true ✅ (все 0 элементов соответствуют!)
+```
+
+**Почему `every` возвращает `true` для пустого массива?** Это математическое правило: для пустого множества все элементы соответствуют любому условию (vacuous truth).
+
+#### Прерывание выполнения
+
+Все три метода **прерывают выполнение**, когда находят результат:
+
+```js
+const numbers = [1, 2, 3, 4, 5];
+
+// some прервётся на первом true
+numbers.some(n => {
+  console.log(n);  // 1, 2 (прервалось на 2, т.к. 2 > 1)
+  return n > 1;
+});
+
+// every прервётся на первом false
+numbers.every(n => {
+  console.log(n);  // 1 (прервалось на 1, т.к. 1 не > 1)
+  return n > 1;
+});
+```
+
+### Примеры использования
+
+```js
+const products = [
+  { name: "Laptop", price: 1000, inStock: true },
+  { name: "Phone", price: 500, inStock: false },
+  { name: "Tablet", price: 300, inStock: true }
+];
+
+// Найти первый доступный товар
+const available = products.find(p => p.inStock);
+// { name: "Laptop", price: 1000, inStock: true }
+
+// Проверить, есть ли дорогие товары (> 800)
+const hasExpensive = products.some(p => p.price > 800);
+// true
+
+// Проверить, все ли товары доступны
+const allAvailable = products.every(p => p.inStock);
+// false
+```
+
+### Разница с `filter`
+
+```js
+const numbers = [1, 2, 3, 4, 5];
+
+// find — первый элемент
+numbers.find(n => n > 2);  // 3 ✅ (один элемент)
+
+// filter — все подходящие элементы
+numbers.filter(n => n > 2);  // [3, 4, 5] ✅ (массив)
+```
+
+### Итоги
+
+- `find` — находит первый подходящий элемент (или `undefined`)
+- `some` — проверяет, есть ли хотя бы один (`true`/`false`)
+- `every` — проверяет, все ли подходят (`true`/`false`)
+- Все три прерывают выполнение при нахождении результата
+- `every` возвращает `true` для пустого массива
+
+---
+
+## 49. Мутирующие и немутирующие методы массивов
+
+Важно знать, какие методы массивов изменяют исходный массив, а какие создают новый.
+
+### Немутирующие методы (не изменяют исходный массив)
+
+Эти методы **возвращают новый массив** или значение:
+
+```js
+const arr = [1, 2, 3];
+
+arr.map(x => x * 2);        // [2, 4, 6] ✅ (новый массив)
+arr.filter(x => x > 1);     // [2, 3] ✅ (новый массив)
+arr.slice(0, 2);            // [1, 2] ✅ (новый массив)
+arr.concat([4]);            // [1, 2, 3, 4] ✅ (новый массив)
+arr.reduce((a, b) => a + b); // 6 ✅ (значение)
+
+console.log(arr);  // [1, 2, 3] ✅ (не изменился)
+```
+
+**Список немутирующих методов:**
+- `map` — преобразование
+- `filter` — фильтрация
+- `slice` — копирование части
+- `concat` — объединение
+- `reduce` / `reduceRight` — свёртка
+- `find` / `findIndex` — поиск
+- `some` / `every` — проверка
+- `indexOf` / `lastIndexOf` — поиск индекса
+- `includes` — проверка наличия
+- `join` — объединение в строку
+
+### Мутирующие методы (изменяют исходный массив)
+
+Эти методы **изменяют исходный массив**:
+
+```js
+const arr = [1, 2, 3];
+
+arr.push(4);        // [1, 2, 3, 4] ❌ (изменён)
+arr.pop();          // [1, 2, 3] ❌ (изменён)
+arr.unshift(0);     // [0, 1, 2, 3] ❌ (изменён)
+arr.shift();        // [1, 2, 3] ❌ (изменён)
+arr.sort();         // ❌ (изменён)
+arr.reverse();      // ❌ (изменён)
+arr.splice(1, 1);   // ❌ (изменён)
+
+console.log(arr);  // изменён! ❌
+```
+
+**Список мутирующих методов:**
+- `push` — добавить в конец
+- `pop` — удалить с конца
+- `unshift` — добавить в начало
+- `shift` — удалить с начала
+- `sort` — сортировка
+- `reverse` — обратный порядок
+- `splice` — удаление/вставка элементов
+- `fill` — заполнение
+- `copyWithin` — копирование внутри массива
+
+### Как сделать мутирующие методы немутирующими?
+
+#### 1. Создать копию перед изменением
+
+```js
+const arr = [3, 1, 2];
+
+// sort — мутирует
+arr.sort();  // ❌ изменяет arr
+
+// Правильно — создать копию
+const sorted = [...arr].sort();  // ✅ новый массив
+console.log(arr);  // [3, 1, 2] (не изменился)
+```
+
+#### 2. Использовать альтернативы
+
+```js
+// push — мутирует
+arr.push(4);  // ❌
+
+// Альтернатива — concat или spread
+const newArr = arr.concat(4);  // ✅
+// или
+const newArr = [...arr, 4];  // ✅
+
+// reverse — мутирует
+arr.reverse();  // ❌
+
+// Альтернатива — создать копию
+const reversed = [...arr].reverse();  // ✅
+```
+
+### ⚠️ Частая ошибка
+
+Использование мутирующих методов, думая, что они немутирующие:
+
+```js
+const numbers = [3, 1, 2];
+
+function getSorted(arr) {
+  return arr.sort();  // ❌ мутирует исходный массив!
+}
+
+const sorted = getSorted(numbers);
+console.log(numbers);  // [1, 2, 3] ⚠️ (изменился!)
+```
+
+**Правильно:**
+```js
+function getSorted(arr) {
+  return [...arr].sort();  // ✅ создаёт копию
+}
+```
+
+### Особый случай: `sort`
+
+`sort` **всегда мутирует** массив:
+
+```js
+const arr = [3, 1, 2];
+const sorted = arr.sort();
+
+console.log(arr);    // [1, 2, 3] ❌ (изменился!)
+console.log(sorted); // [1, 2, 3] (та же ссылка!)
+
+// arr === sorted → true (один и тот же массив!)
+```
+
+**Правильно:**
+```js
+const sorted = [...arr].sort();  // ✅ копия
+```
+
+### Когда использовать мутирующие методы?
+
+Мутирующие методы можно использовать, когда:
+- Нужно изменить массив на месте (для производительности)
+- Массив больше не используется после изменения
+- Работа с большими массивами (экономия памяти)
+
+Но в современном JavaScript обычно предпочитают иммутабельный подход.
+
+### Сравнительная таблица
+
+| Метод | Тип | Возвращает |
+|-------|-----|-----------|
+| `map`, `filter`, `slice` | Немутирующий | Новый массив |
+| `push`, `pop`, `sort` | Мутирующий | Изменённый массив (та же ссылка) |
+| `find`, `some`, `every` | Немутирующий | Значение/boolean |
+
+### Итоги
+
+- Немутирующие методы создают новый массив
+- Мутирующие методы изменяют исходный массив
+- Используйте spread `[...arr]` для копирования перед мутацией
+- В современном коде предпочитают немутирующие методы
+
+---
+
+## 50. `Set`, `Map`, `WeakSet`, `WeakMap`
+
+Это специальные коллекции в JavaScript для работы с данными. Каждая имеет свои особенности.
+
+### `Set` — коллекция уникальных значений
+
+`Set` хранит **только уникальные значения** (примитивы или ссылки на объекты):
+
+```js
+const set = new Set([1, 2, 2, 3, 3, 3]);
+console.log(set);  // Set(3) {1, 2, 3} ✅ (дубликаты удалены)
+
+set.add(4);
+set.add(2);  // не добавится (уже есть)
+console.log(set.size);  // 4
+```
+
+**Методы:**
+```js
+const set = new Set();
+
+set.add(value);      // добавить
+set.has(value);      // проверить наличие
+set.delete(value);   // удалить
+set.clear();         // очистить
+set.size;            // размер (не length!)
+```
+
+**Примеры использования:**
+```js
+// Удаление дубликатов из массива
+const arr = [1, 2, 2, 3, 3, 3];
+const unique = [...new Set(arr)];  // [1, 2, 3] ✅
+
+// Проверка уникальности
+const emails = ["a@test.com", "b@test.com", "a@test.com"];
+const uniqueEmails = new Set(emails);
+if (emails.length !== uniqueEmails.size) {
+  console.log("Есть дубликаты!");
+}
+```
+
+### `Map` — коллекция пар ключ-значение
+
+`Map` хранит пары **ключ-значение**, где ключом может быть **любой тип** (не только строка):
+
+```js
+const map = new Map();
+
+map.set("name", "Alex");           // строка как ключ
+map.set(1, "one");                 // число как ключ
+map.set(true, "yes");              // boolean как ключ
+map.set({ id: 1 }, "object key");  // объект как ключ! ✅
+
+console.log(map.get("name"));      // "Alex"
+console.log(map.get(1));           // "one"
+```
+
+**Методы:**
+```js
+const map = new Map();
+
+map.set(key, value);  // установить
+map.get(key);         // получить
+map.has(key);         // проверить
+map.delete(key);      // удалить
+map.clear();          // очистить
+map.size;             // размер
+```
+
+**Итерация:**
+```js
+const map = new Map([["a", 1], ["b", 2]]);
+
+map.keys();      // итератор ключей
+map.values();    // итератор значений
+map.entries();   // итератор пар [key, value]
+
+for (let [key, value] of map) {
+  console.log(key, value);
+}
+```
+
+### `WeakSet` — Set для объектов
+
+`WeakSet` похож на `Set`, но:
+- Хранит **только объекты** (не примитивы)
+- **Не итерируемый** (нет методов для перебора)
+- Не препятствует сборке мусора (weak references)
+
+```js
+const weakSet = new WeakSet();
+
+const obj = { id: 1 };
+weakSet.add(obj);
+weakSet.has(obj);  // true
+weakSet.delete(obj);
+
+// Нет size, нет итерации!
+```
+
+**Использование:** для хранения "меток" объектов (например, обработанные объекты).
+
+### `WeakMap` — Map для объектов как ключей
+
+`WeakMap` похож на `Map`, но:
+- Ключами могут быть **только объекты**
+- **Не итерируемый**
+- Не препятствует сборке мусора
+
+```js
+const weakMap = new WeakMap();
+
+const key = { id: 1 };
+weakMap.set(key, "value");
+weakMap.get(key);  // "value"
+weakMap.has(key);  // true
+
+// Нет size, нет итерации!
+```
+
+**Использование:** приватные данные объектов, кэши, метаданные.
+
+### Сравнительная таблица
+
+| Коллекция | Ключи | Итерация | Weak references |
+|-----------|-------|----------|----------------|
+| `Set` | Любые | ✅ Да | ❌ Нет |
+| `Map` | Любые | ✅ Да | ❌ Нет |
+| `WeakSet` | Только объекты | ❌ Нет | ✅ Да |
+| `WeakMap` | Только объекты | ❌ Нет | ✅ Да |
+
+### Когда использовать что?
+
+- **`Set`** — когда нужны уникальные значения
+- **`Map`** — когда нужны ключи любого типа (не только строки)
+- **`WeakSet`** — для меток объектов (редко)
+- **`WeakMap`** — для приватных данных объектов, кэшей
+
+### Пример: `Map` vs обычный объект
+
+```js
+// Обычный объект — ключи только строки
+const obj = {};
+obj[1] = "one";
+obj["1"];  // "one" (1 преобразовано в "1")
+
+// Map — ключи сохраняют тип
+const map = new Map();
+map.set(1, "one");
+map.set("1", "one string");
+map.get(1);     // "one"
+map.get("1");   // "one string" ✅ (разные ключи!)
+```
+
+### Итоги
+
+- `Set` — уникальные значения
+- `Map` — пары ключ-значение, ключи любого типа
+- `WeakSet` / `WeakMap` — только объекты, weak references
+- `Set`/`Map` — итерируемые, `Weak*` — нет
+- Используйте `Set` для уникальности, `Map` для ключей любого типа
+
+---
