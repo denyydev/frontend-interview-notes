@@ -7512,3 +7512,1426 @@ function example() {
 - Можно использовать `.then()` или `await`
 
 ---
+
+## 61. Можно ли использовать `await` вне `async`
+
+Короткий ответ: **нет, нельзя** (в обычном коде). Но есть исключения.
+
+### Обычное правило
+
+`await` можно использовать **только внутри `async` функции**:
+
+```js
+// Ошибка ❌
+const data = await fetchData();  // SyntaxError
+
+// Правильно ✅
+async function loadData() {
+  const data = await fetchData();  // работает
+}
+```
+
+### Исключение: Top-level await (ES2022)
+
+В **ES2022 модулях** можно использовать `await` на верхнем уровне (top-level await):
+
+```js
+// В модуле (ES2022)
+const data = await fetchData();  // ✅ работает!
+
+export { data };
+```
+
+**Условия:**
+- Файл должен быть ES модулем (`type="module"` в HTML или `.mjs` расширение)
+- Поддержка ES2022
+
+**Пример:**
+```js
+// main.mjs
+const response = await fetch('/api/data');
+const data = await response.json();
+console.log(data);
+```
+
+### Почему нужно `async`?
+
+`await` **приостанавливает выполнение** функции. JavaScript должен знать, что функция может быть приостановлена, поэтому нужна пометка `async`.
+
+```js
+async function example() {
+  const data = await fetchData();  // функция приостановлена здесь
+  console.log(data);  // выполнится после получения данных
+}
+```
+
+### Что происходит при `await`?
+
+Когда встречается `await`:
+1. Выполнение функции **приостанавливается**
+2. Контроль возвращается в Event Loop
+3. Когда Promise завершается, выполнение продолжается
+4. `await` возвращает результат Promise
+
+Без `async` JavaScript не знает, как обработать приостановку.
+
+### Обходные пути (не рекомендуются)
+
+Можно использовать IIFE:
+
+```js
+(async function() {
+  const data = await fetchData();
+  console.log(data);
+})();
+```
+
+Но лучше просто сделать функцию `async`.
+
+### Итоги
+
+- `await` можно использовать только в `async` функции
+- Исключение: top-level await в ES2022 модулях
+- Без `async` будет SyntaxError
+- `async` нужна, чтобы JavaScript знал о приостановке выполнения
+
+---
+
+## 62. Что такое Event Loop и зачем он нужен
+
+Event Loop (Цикл событий) — это механизм JavaScript, который позволяет выполнять **асинхронный код**, не блокируя основной поток.
+
+### Проблема: JavaScript однопоточный
+
+JavaScript **однопоточный** — может выполнять только одну задачу за раз. Но нам нужно:
+- Загружать данные с сервера
+- Обрабатывать события
+- Анимации
+- И всё это одновременно?
+
+Event Loop решает эту проблему!
+
+### Как работает Event Loop?
+
+Event Loop работает по принципу **очереди задач**:
+
+1. Выполняется весь **синхронный код**
+2. Когда стек пуст, Event Loop берёт задачу из **очереди**
+3. Выполняет её
+4. Повторяет процесс
+
+### Визуальная аналогия
+
+Представьте ресторан:
+- **Официант (Event Loop)** — один человек
+- **Столы (Call Stack)** — где он работает
+- **Заказы (очередь задач)** — что нужно сделать
+
+Официант обслуживает один стол, затем переходит к следующему заказу. Так работает Event Loop.
+
+### Простой пример
+
+```js
+console.log("1");
+
+setTimeout(() => {
+  console.log("2");
+}, 0);
+
+console.log("3");
+
+// Вывод: 1, 3, 2
+```
+
+**Почему так?**
+1. Выполняется `console.log("1")` — синхронно
+2. `setTimeout` ставит задачу в очередь
+3. Выполняется `console.log("3")` — синхронно
+4. Когда стек пуст, Event Loop берёт задачу из `setTimeout`
+5. Выполняется `console.log("2")`
+
+### Зачем нужен Event Loop?
+
+Без Event Loop:
+- Асинхронные операции блокировали бы основной поток
+- Интерфейс "зависал" бы
+- Нельзя было бы делать несколько вещей одновременно
+
+С Event Loop:
+- Асинхронные операции не блокируют
+- Интерфейс остаётся отзывчивым
+- Можно "одновременно" делать несколько вещей
+
+### Очереди задач
+
+Event Loop управляет двумя типами очередей:
+
+1. **Microtasks** (микротаски) — высокий приоритет
+   - `Promise.then/catch/finally`
+   - `queueMicrotask()`
+
+2. **Macrotasks** (макротаски) — низкий приоритет
+   - `setTimeout`
+   - `setInterval`
+   - События DOM
+
+### Порядок выполнения
+
+1. Весь синхронный код
+2. **Все microtasks** (до полной очистки)
+3. Одна **macrotask**
+4. Повтор
+
+### Итоги
+
+- Event Loop — механизм выполнения асинхронного кода
+- JavaScript однопоточный, Event Loop делает его неблокирующим
+- Управляет очередями задач (microtasks и macrotasks)
+- Без Event Loop интерфейс бы "зависал"
+
+---
+
+## 63. Call Stack
+
+Call Stack (Стек вызовов) — это структура данных, которая отслеживает, **какие функции выполняются в данный момент**.
+
+### Что такое стек?
+
+Стек — это структура данных типа **LIFO** (Last In, First Out — последний пришёл, первый ушёл). Как стопка тарелок: кладём сверху, берём сверху.
+
+### Как работает Call Stack?
+
+Когда вызывается функция, она **добавляется наверх** стека. Когда функция завершается, она **убирается из стека**.
+
+```js
+function first() {
+  console.log("first");
+  second();
+}
+
+function second() {
+  console.log("second");
+  third();
+}
+
+function third() {
+  console.log("third");
+}
+
+first();
+```
+
+**Состояние стека:**
+1. `first()` вызывается → стек: `[first]`
+2. `first()` вызывает `second()` → стек: `[first, second]`
+3. `second()` вызывает `third()` → стек: `[first, second, third]`
+4. `third()` завершается → стек: `[first, second]`
+5. `second()` завершается → стек: `[first]`
+6. `first()` завершается → стек: `[]`
+
+### Визуализация
+
+```
+┌─────────┐
+│ third() │  ← выполняется
+├─────────┤
+│ second()│
+├─────────┤
+│ first() │
+└─────────┘
+Call Stack
+```
+
+### Переполнение стека (Stack Overflow)
+
+Если функция вызывает сама себя бесконечно, стек переполняется:
+
+```js
+function infinite() {
+  infinite();  // вызывает сама себя
+}
+
+infinite();  // RangeError: Maximum call stack size exceeded ❌
+```
+
+### Синхронный код выполняется сразу
+
+Синхронный код попадает в Call Stack и выполняется **немедленно**:
+
+```js
+console.log("1");
+console.log("2");
+console.log("3");
+
+// Выполняется: 1, 2, 3 (сразу, по порядку)
+```
+
+### Асинхронный код — не в стеке
+
+Асинхронные операции **не попадают в Call Stack сразу**:
+
+```js
+console.log("1");
+
+setTimeout(() => {
+  console.log("2");  // не в стеке сразу!
+}, 0);
+
+console.log("3");
+
+// Вывод: 1, 3, 2
+// "2" выполнится позже, когда стек пуст
+```
+
+### Связь с Event Loop
+
+Event Loop **ждёт, пока Call Stack пуст**, затем берёт задачу из очереди и выполняет её:
+
+1. Call Stack пуст?
+2. Да → Event Loop берёт задачу из очереди
+3. Кладёт задачу в Call Stack
+4. Выполняется
+5. Повтор
+
+### Итоги
+
+- Call Stack — структура данных для отслеживания выполняющихся функций
+- Работает по принципу LIFO
+- Синхронный код выполняется сразу
+- Асинхронный код ждёт, пока стек пуст
+- Event Loop управляет задачами, когда стек пуст
+
+---
+
+## 64. Microtasks и Macrotasks
+
+В Event Loop есть два типа очередей с разным приоритетом: **microtasks** и **macrotasks**.
+
+### Что такое microtasks и macrotasks?
+
+- **Microtasks** (микротаски) — задачи с **высоким приоритетом**
+- **Macrotasks** (макротаски) — задачи с **низким приоритетом**
+
+### Microtasks
+
+Microtasks выполняются **сразу после синхронного кода**, до macrotasks:
+
+```js
+console.log("1");
+
+Promise.resolve().then(() => console.log("2"));
+
+setTimeout(() => console.log("3"), 0);
+
+console.log("4");
+
+// Вывод: 1, 4, 2, 3
+// Порядок: синхронный код → microtasks → macrotasks
+```
+
+**Что относится к microtasks:**
+- `Promise.then()`
+- `Promise.catch()`
+- `Promise.finally()`
+- `queueMicrotask()`
+- `MutationObserver`
+
+### Macrotasks
+
+Macrotasks выполняются **после всех microtasks**:
+
+```js
+console.log("1");
+
+setTimeout(() => console.log("2"), 0);
+
+Promise.resolve().then(() => console.log("3"));
+
+console.log("4");
+
+// Вывод: 1, 4, 3, 2
+// microtask (3) выполнился раньше macrotask (2)
+```
+
+**Что относится к macrotasks:**
+- `setTimeout`
+- `setInterval`
+- События DOM (клики, скролл и т.д.)
+- `setImmediate` (Node.js)
+- `requestAnimationFrame` (браузер)
+
+### Порядок выполнения
+
+1. **Весь синхронный код** (Call Stack)
+2. **Все microtasks** (до полной очистки!)
+3. **Одна macrotask**
+4. Снова все microtasks
+5. Следующая macrotask
+6. И так далее
+
+### Пример: все microtasks выполняются до macrotasks
+
+```js
+console.log("1");
+
+setTimeout(() => console.log("macrotask"), 0);
+
+Promise.resolve().then(() => console.log("microtask 1"));
+Promise.resolve().then(() => console.log("microtask 2"));
+Promise.resolve().then(() => {
+  console.log("microtask 3");
+  Promise.resolve().then(() => console.log("microtask 4"));
+});
+
+console.log("2");
+
+// Вывод: 1, 2, microtask 1, microtask 2, microtask 3, microtask 4, macrotask
+// Все microtasks выполняются до macrotask!
+```
+
+### Почему так сделано?
+
+Microtasks — это обычно **обработчики Promise**, которые должны выполниться быстро, чтобы код был предсказуемым.
+
+Macrotasks — это **более тяжёлые операции**, которые могут подождать.
+
+### Цепочки microtasks
+
+Если в microtask создаётся новый microtask, он **тоже выполнится до macrotasks**:
+
+```js
+Promise.resolve().then(() => {
+  console.log("1");
+  Promise.resolve().then(() => {
+    console.log("2");
+    Promise.resolve().then(() => console.log("3"));
+  });
+});
+
+setTimeout(() => console.log("macrotask"), 0);
+
+// Вывод: 1, 2, 3, macrotask
+// Все microtasks выполняются до macrotask
+```
+
+### Сравнительная таблица
+
+| Тип | Приоритет | Примеры | Когда выполняется |
+|-----|-----------|---------|-------------------|
+| Microtasks | Высокий | Promise.then, queueMicrotask | Сразу после синхронного кода |
+| Macrotasks | Низкий | setTimeout, события | После всех microtasks |
+
+### Итоги
+
+- Microtasks — высокий приоритет, выполняются первыми
+- Macrotasks — низкий приоритет, выполняются после microtasks
+- Все microtasks выполняются до первой macrotask
+- Это обеспечивает предсказуемость асинхронного кода
+
+---
+
+## 65. Порядок выполнения `async / await`
+
+`async / await` работает поверх Promise и подчиняется правилам Event Loop. Важно понимать порядок выполнения.
+
+### Код до `await` — синхронный
+
+Код **до первого `await`** выполняется **синхронно**:
+
+```js
+console.log("1");
+
+async function test() {
+  console.log("2");  // синхронно!
+  await Promise.resolve();
+  console.log("3");
+}
+
+test();
+console.log("4");
+
+// Вывод: 1, 2, 4, 3
+```
+
+**Почему так?**
+1. `console.log("1")` — синхронно
+2. `test()` вызывается
+3. `console.log("2")` — синхронно (до await)
+4. `await` приостанавливает выполнение
+5. `console.log("4")` — синхронно
+6. `console.log("3")` — после await (microtask)
+
+### `await` создаёт microtask
+
+Когда встречается `await`, код после него становится **microtask**:
+
+```js
+async function example() {
+  console.log("до await");
+  await Promise.resolve();  // здесь выполнение приостанавливается
+  console.log("после await");  // это microtask
+}
+```
+
+### Порядок выполнения
+
+```js
+console.log("1");
+
+async function async1() {
+  console.log("2");
+  await Promise.resolve();
+  console.log("3");
+}
+
+async function async2() {
+  console.log("4");
+  await Promise.resolve();
+  console.log("5");
+}
+
+async1();
+async2();
+console.log("6");
+
+// Вывод: 1, 2, 4, 6, 3, 5
+```
+
+**Почему?**
+1. `1` — синхронно
+2. `async1()` вызывается, `2` — синхронно
+3. `await` в `async1()` → код после него в microtasks
+4. `async2()` вызывается, `4` — синхронно
+5. `await` в `async2()` → код после него в microtasks
+6. `6` — синхронно
+7. `3`, `5` — microtasks (в порядке создания)
+
+### `await` всегда "уступает" стеку
+
+`await` **всегда приостанавливает выполнение**, даже если Promise уже resolved:
+
+```js
+console.log("1");
+
+async function test() {
+  console.log("2");
+  await Promise.resolve();  // уже resolved, но всё равно уступает
+  console.log("3");
+}
+
+test();
+console.log("4");
+
+// Вывод: 1, 2, 4, 3
+// "3" выполнится после "4", даже если Promise уже готов
+```
+
+### Цепочки `await`
+
+```js
+async function example() {
+  console.log("1");
+  await Promise.resolve();
+  console.log("2");
+  await Promise.resolve();
+  console.log("3");
+}
+
+example();
+console.log("4");
+
+// Вывод: 1, 4, 2, 3
+```
+
+### Вложенные async функции
+
+```js
+async function outer() {
+  console.log("outer 1");
+  await inner();
+  console.log("outer 2");
+}
+
+async function inner() {
+  console.log("inner 1");
+  await Promise.resolve();
+  console.log("inner 2");
+}
+
+outer();
+console.log("sync");
+
+// Вывод: outer 1, inner 1, sync, inner 2, outer 2
+```
+
+### Итоги
+
+- Код до `await` выполняется синхронно
+- `await` приостанавливает выполнение
+- Код после `await` становится microtask
+- `await` всегда уступает стеку, даже если Promise готов
+- Порядок выполнения предсказуемый
+
+---
+
+## 66. Когда реально выполняется `setTimeout`
+
+`setTimeout` выполняется **не точно** через указанное время. Важно понимать, когда он реально выполнится.
+
+### Задержка — минимальное время
+
+Задержка в `setTimeout` — это **минимальное время ожидания**, а не точное:
+
+```js
+setTimeout(() => {
+  console.log("выполнилось");
+}, 1000);
+
+// Выполнится НЕ РАНЬШЕ чем через 1000мс
+// Но может позже!
+```
+
+### Когда выполняется `setTimeout`?
+
+`setTimeout` выполнится, когда:
+1. Прошло **минимум** указанное время
+2. Call Stack **пуст**
+3. Все **microtasks** выполнены
+4. Дошла очередь до этой **macrotask**
+
+### Пример: блокирующий код
+
+```js
+setTimeout(() => {
+  console.log("timeout");
+}, 0);
+
+// Блокирующий код
+for (let i = 0; i < 1000000000; i++) {
+  // долгая операция
+}
+
+console.log("done");
+
+// Вывод: done, timeout
+// timeout выполнится ПОСЛЕ блокирующего кода, даже если задержка 0!
+```
+
+### `setTimeout(fn, 0)` не означает "сразу"
+
+```js
+console.log("1");
+
+setTimeout(() => {
+  console.log("2");
+}, 0);
+
+Promise.resolve().then(() => console.log("3"));
+
+console.log("4");
+
+// Вывод: 1, 4, 3, 2
+// setTimeout(0) выполнится ПОСЛЕ microtasks!
+```
+
+### Порядок выполнения
+
+```js
+console.log("sync 1");
+
+setTimeout(() => console.log("timeout 1"), 0);
+setTimeout(() => console.log("timeout 2"), 0);
+
+Promise.resolve().then(() => console.log("microtask 1"));
+Promise.resolve().then(() => console.log("microtask 2"));
+
+console.log("sync 2");
+
+// Вывод: sync 1, sync 2, microtask 1, microtask 2, timeout 1, timeout 2
+```
+
+### Почему так?
+
+1. `setTimeout` ставит задачу в очередь **macrotasks**
+2. Macrotasks выполняются **после всех microtasks**
+3. Даже с задержкой 0, `setTimeout` ждёт своей очереди
+
+### Реальное время выполнения
+
+```js
+const start = Date.now();
+
+setTimeout(() => {
+  const elapsed = Date.now() - start;
+  console.log(`Прошло ${elapsed}мс`);  // может быть больше 1000!
+}, 1000);
+
+// Если стек занят, реальное время будет больше 1000мс
+```
+
+### Точность таймеров
+
+Таймеры в JavaScript **не точные**:
+- Минимальная задержка в браузере — около 4мс (для `setTimeout(0)`)
+- В фоновых вкладках задержки могут быть больше
+- Точность зависит от нагрузки системы
+
+### Итоги
+
+- `setTimeout` выполняется не раньше указанного времени
+- Может выполниться позже, если стек занят
+- Выполняется после всех microtasks
+- `setTimeout(0)` не означает "сразу"
+- Таймеры не точные
+
+---
+
+## 67. Порядок выполнения `Promise`, `setTimeout`, `async / await`
+
+Это классический вопрос на собеседованиях. Важно понимать порядок выполнения всех этих конструкций.
+
+### Общее правило
+
+Порядок выполнения:
+1. **Синхронный код**
+2. **Microtasks** (Promise, async/await)
+3. **Macrotasks** (setTimeout)
+
+### Пример 1: Promise и setTimeout
+
+```js
+console.log("1");
+
+setTimeout(() => console.log("2"), 0);
+
+Promise.resolve().then(() => console.log("3"));
+
+console.log("4");
+
+// Вывод: 1, 4, 3, 2
+// Порядок: sync → microtasks → macrotasks
+```
+
+### Пример 2: async/await и setTimeout
+
+```js
+console.log("1");
+
+async function async1() {
+  console.log("2");
+  await Promise.resolve();
+  console.log("3");
+}
+
+setTimeout(() => console.log("4"), 0);
+
+async1();
+console.log("5");
+
+// Вывод: 1, 2, 5, 3, 4
+```
+
+**Разбор:**
+1. `1` — синхронно
+2. `async1()` вызывается, `2` — синхронно (до await)
+3. `await` приостанавливает, код после него → microtask
+4. `setTimeout` → macrotask
+5. `5` — синхронно
+6. `3` — microtask (выполняется первым)
+7. `4` — macrotask
+
+### Пример 3: Сложный случай
+
+```js
+console.log("1");
+
+setTimeout(() => console.log("2"), 0);
+
+Promise.resolve().then(() => {
+  console.log("3");
+  Promise.resolve().then(() => console.log("4"));
+});
+
+setTimeout(() => console.log("5"), 0);
+
+async function test() {
+  console.log("6");
+  await Promise.resolve();
+  console.log("7");
+}
+
+test();
+console.log("8");
+
+// Вывод: 1, 6, 8, 3, 4, 7, 2, 5
+```
+
+**Разбор:**
+1. `1` — sync
+2. `setTimeout(2)` → macrotask
+3. `Promise.then(3)` → microtask
+4. `setTimeout(5)` → macrotask
+5. `test()` вызывается, `6` — sync
+6. `await` → код после него → microtask
+7. `8` — sync
+8. Microtasks: `3`, создаётся новый microtask `4`, `4`, `7`
+9. Macrotasks: `2`, `5`
+
+### Важные правила
+
+1. **Все microtasks выполняются до macrotasks**
+2. **Код до `await` — синхронный**
+3. **Код после `await` — microtask**
+4. **`setTimeout` — всегда macrotask**
+
+### Визуализация
+
+```
+Синхронный код
+    ↓
+Все microtasks (до очистки)
+    ↓
+Одна macrotask
+    ↓
+Все microtasks (если создались)
+    ↓
+Следующая macrotask
+```
+
+### Итоги
+
+- Порядок: sync → microtasks → macrotasks
+- Promise и async/await — microtasks
+- setTimeout — macrotask
+- Все microtasks выполняются до macrotasks
+- Код до await — синхронный, после await — microtask
+
+---
+
+## 68. Как работает `try / catch / finally`
+
+`try / catch / finally` — конструкция для обработки ошибок в JavaScript. Понимание её работы важно.
+
+### Базовый синтаксис
+
+```js
+try {
+  // код, который может выбросить ошибку
+  riskyOperation();
+} catch (error) {
+  // обработка ошибки
+  console.error(error);
+} finally {
+  // выполняется всегда
+  console.log("завершено");
+}
+```
+
+### `try` — блок кода
+
+В `try` пишется код, который может выбросить ошибку:
+
+```js
+try {
+  const data = JSON.parse("невалидный JSON");
+  console.log(data);
+} catch (error) {
+  console.error("Ошибка парсинга:", error);
+}
+```
+
+### `catch` — обработка ошибки
+
+`catch` ловит ошибку, выброшенную в `try`:
+
+```js
+try {
+  throw new Error("Что-то пошло не так");
+} catch (error) {
+  console.error(error.message);  // "Что-то пошло не так"
+}
+```
+
+**Важно:** `catch` ловит только ошибки из **синхронного кода** в `try`.
+
+### `finally` — выполняется всегда
+
+`finally` выполняется **в любом случае** — и при успехе, и при ошибке:
+
+```js
+try {
+  console.log("попытка");
+  throw new Error("ошибка");
+} catch (error) {
+  console.log("ошибка поймана");
+} finally {
+  console.log("всегда выполнится");
+}
+
+// Вывод: попытка, ошибка поймана, всегда выполнится
+```
+
+### Порядок выполнения
+
+```js
+function test() {
+  try {
+    console.log("1");
+    return "return из try";
+  } catch (error) {
+    console.log("2");
+    return "return из catch";
+  } finally {
+    console.log("3");
+  }
+}
+
+console.log(test());
+// Вывод: 1, 3, return из try
+```
+
+**Важно:** `finally` выполняется **перед** `return`!
+
+### `return` в `finally`
+
+Если в `finally` есть `return`, он **переопределяет** возврат из `try`/`catch`:
+
+```js
+function test() {
+  try {
+    return "из try";
+  } finally {
+    return "из finally";  // этот return имеет приоритет!
+  }
+}
+
+console.log(test());  // "из finally"
+```
+
+### Без `catch`
+
+Можно использовать `try / finally` без `catch`:
+
+```js
+try {
+  riskyOperation();
+} finally {
+  cleanup();  // выполнится всегда, даже если была ошибка
+}
+```
+
+Но ошибка **не будет обработана** и "пробросится" дальше.
+
+### Вложенные `try / catch`
+
+```js
+try {
+  try {
+    throw new Error("внутренняя ошибка");
+  } catch (error) {
+    console.log("внутренний catch:", error.message);
+    throw error;  // пробрасываем дальше
+  }
+} catch (error) {
+  console.log("внешний catch:", error.message);
+}
+```
+
+### Ограничения
+
+`try / catch` **не ловит** ошибки из:
+- Асинхронного кода (setTimeout, Promise без await)
+- Колбэков
+- Событий
+
+```js
+try {
+  setTimeout(() => {
+    throw new Error("ошибка");
+  }, 0);
+} catch (error) {
+  // НЕ поймает! ❌
+  console.error(error);
+}
+```
+
+### Итоги
+
+- `try` — блок кода, который может выбросить ошибку
+- `catch` — обработка ошибки
+- `finally` — выполняется всегда, даже при return
+- `finally` выполняется перед return
+- Не ловит ошибки из асинхронного кода
+
+---
+
+## 69. Как ловить ошибки в `async / await`
+
+Ошибки в `async / await` можно ловить несколькими способами. Важно знать все варианты.
+
+### Способ 1: `try / catch` (рекомендуется)
+
+Самый простой и понятный способ:
+
+```js
+async function loadData() {
+  try {
+    const data = await fetchData();
+    const processed = await processData(data);
+    return processed;
+  } catch (error) {
+    console.error("Ошибка:", error);
+    // можно вернуть значение по умолчанию
+    return getDefaultData();
+  }
+}
+```
+
+### Способ 2: `.catch()` на Promise
+
+`async` функция возвращает Promise, поэтому можно использовать `.catch()`:
+
+```js
+async function loadData() {
+  const data = await fetchData();
+  return processData(data);
+}
+
+loadData()
+  .then(result => console.log(result))
+  .catch(error => console.error(error));
+```
+
+### Комбинированный подход
+
+Можно комбинировать:
+
+```js
+async function loadData() {
+  try {
+    const data = await fetchData();
+    return processData(data);
+  } catch (error) {
+    console.error("Локальная обработка:", error);
+    throw error;  // пробрасываем дальше
+  }
+}
+
+loadData()
+  .then(result => console.log(result))
+  .catch(error => console.error("Глобальная обработка:", error));
+```
+
+### Ошибки в цепочке `await`
+
+Один `catch` ловит все ошибки в цепочке:
+
+```js
+async function example() {
+  try {
+    const user = await fetchUser(1);      // может упасть здесь
+    const posts = await fetchPosts(user.id);  // или здесь
+    const comments = await fetchComments(posts[0].id);  // или здесь
+  } catch (error) {
+    // ловит ошибку из любой части цепочки ✅
+    console.error(error);
+  }
+}
+```
+
+### Обработка конкретных ошибок
+
+Можно обрабатывать разные типы ошибок:
+
+```js
+async function loadData() {
+  try {
+    const data = await fetchData();
+    return data;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      console.error("Ошибка типа:", error);
+    } else if (error instanceof Error) {
+      console.error("Общая ошибка:", error);
+    } else {
+      console.error("Неизвестная ошибка:", error);
+    }
+    throw error;
+  }
+}
+```
+
+### Продолжение после ошибки
+
+После `catch` можно продолжить выполнение:
+
+```js
+async function loadData() {
+  try {
+    const data = await fetchData();
+    return data;
+  } catch (error) {
+    console.error("Ошибка загрузки:", error);
+    // возвращаем значение по умолчанию
+    return getDefaultData();
+  }
+}
+
+const data = await loadData();  // получим данные или default
+```
+
+### `finally` в async функциях
+
+`finally` работает и в async функциях:
+
+```js
+async function loadData() {
+  let loader = true;
+  try {
+    const data = await fetchData();
+    return data;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  } finally {
+    loader = false;  // выполнится всегда
+  }
+}
+```
+
+### ⚠️ Частая ошибка
+
+Забывают обработать ошибку:
+
+```js
+async function loadData() {
+  const data = await fetchData();  // если ошибка — не обработана! ❌
+  return processData(data);
+}
+
+// Правильно
+async function loadData() {
+  try {
+    const data = await fetchData();
+    return processData(data);
+  } catch (error) {
+    console.error(error);  // ✅ обработано
+    throw error;
+  }
+}
+```
+
+### Итоги
+
+- `try / catch` — основной способ в async функциях
+- `.catch()` — альтернативный способ на Promise
+- Можно комбинировать оба подхода
+- Один `catch` ловит все ошибки в цепочке
+- Всегда обрабатывайте ошибки!
+
+---
+
+## 70. Почему `try/catch` не ловит ошибку в `setTimeout`
+
+Это частая ошибка новичков. `try / catch` **не работает** с асинхронным кодом в колбэках.
+
+### Проблема
+
+```js
+try {
+  setTimeout(() => {
+    throw new Error("Ошибка!");
+  }, 1000);
+} catch (error) {
+  console.error(error);  // НЕ выполнится! ❌
+}
+```
+
+**Ошибка не поймана!** Почему?
+
+### Причина
+
+`try / catch` работает только с **синхронным кодом**. Когда выполняется `setTimeout`, функция `setTimeout` **завершается сразу** (она не ждёт колбэк). Колбэк выполняется **позже**, когда `try / catch` уже завершился.
+
+### Визуализация
+
+```
+1. try блок начинается
+2. setTimeout вызывается → возвращает timer ID (синхронно)
+3. try блок завершается (ошибки нет!)
+4. catch не выполняется
+5. Позже: колбэк setTimeout выполняется
+6. Ошибка выбрасывается, но try/catch уже не работает ❌
+```
+
+### Решение 1: `try / catch` внутри колбэка
+
+```js
+setTimeout(() => {
+  try {
+    throw new Error("Ошибка!");
+  } catch (error) {
+    console.error(error);  // ✅ поймает ошибку
+  }
+}, 1000);
+```
+
+### Решение 2: Promise с async/await
+
+Обернуть `setTimeout` в Promise:
+
+```js
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function example() {
+  try {
+    await delay(1000);
+    throw new Error("Ошибка!");
+  } catch (error) {
+    console.error(error);  // ✅ поймает ошибку
+  }
+}
+```
+
+### Решение 3: Обработчик ошибок в колбэке
+
+```js
+setTimeout(() => {
+  try {
+    riskyOperation();
+  } catch (error) {
+    handleError(error);  // обрабатываем внутри
+  }
+}, 1000);
+```
+
+### Почему так сделано?
+
+JavaScript **однопоточный**. `try / catch` работает только в текущем контексте выполнения. Асинхронные колбэки выполняются **в другом контексте**, когда исходный контекст уже завершён.
+
+### Аналогия
+
+Представьте:
+- **Синхронный код** — как разговор лицом к лицу (можно сразу поймать ошибку)
+- **Асинхронный код** — как письмо (отправили, ответ придёт позже, ошибку не поймать сразу)
+
+### С Promise и async/await работает
+
+```js
+async function example() {
+  try {
+    await new Promise((resolve, reject) => {
+      setTimeout(() => {
+        reject(new Error("Ошибка!"));
+      }, 1000);
+    });
+  } catch (error) {
+    console.error(error);  // ✅ работает!
+  }
+}
+```
+
+**Почему работает?** Потому что `await` **приостанавливает** выполнение функции, и ошибка выбрасывается в том же контексте.
+
+### Итоги
+
+- `try / catch` не работает с колбэками `setTimeout`
+- Колбэк выполняется позже, когда `try / catch` уже завершился
+- Решение: `try / catch` внутри колбэка или Promise/async-await
+- С `async / await` ошибки ловятся правильно
+
+---
+
+## 71. Ключевые отличия ES5 и ES6+
+
+ES6 (ES2015) и последующие версии добавили много важных возможностей. Вот ключевые отличия.
+
+### Переменные: `let` и `const` вместо `var`
+
+**ES5:**
+```js
+var x = 1;
+var x = 2;  // можно переопределять
+```
+
+**ES6+:**
+```js
+let x = 1;
+const y = 2;
+
+x = 3;  // можно изменить
+y = 4;  // TypeError (нельзя изменить)
+```
+
+**Преимущества:** блочная область видимости, TDZ, защита от ошибок.
+
+### Стрелочные функции
+
+**ES5:**
+```js
+var add = function(a, b) {
+  return a + b;
+};
+```
+
+**ES6+:**
+```js
+const add = (a, b) => a + b;
+```
+
+**Преимущества:** короче, нет своего `this`.
+
+### Шаблонные строки (Template Literals)
+
+**ES5:**
+```js
+var name = "Alex";
+var message = "Привет, " + name + "!";
+```
+
+**ES6+:**
+```js
+const name = "Alex";
+const message = `Привет, ${name}!`;
+```
+
+### Деструктуризация
+
+**ES5:**
+```js
+var obj = { a: 1, b: 2 };
+var a = obj.a;
+var b = obj.b;
+```
+
+**ES6+:**
+```js
+const obj = { a: 1, b: 2 };
+const { a, b } = obj;
+```
+
+### Параметры по умолчанию
+
+**ES5:**
+```js
+function greet(name) {
+  name = name || "Гость";
+  return "Привет, " + name;
+}
+```
+
+**ES6+:**
+```js
+function greet(name = "Гость") {
+  return `Привет, ${name}`;
+}
+```
+
+### Spread и Rest операторы
+
+**ES6+:**
+```js
+// Spread
+const arr = [1, 2, 3];
+const newArr = [...arr, 4];
+
+// Rest
+function sum(...numbers) {
+  return numbers.reduce((a, b) => a + b, 0);
+}
+```
+
+### Классы
+
+**ES5:**
+```js
+function User(name) {
+  this.name = name;
+}
+
+User.prototype.sayHi = function() {
+  return "Привет, " + this.name;
+};
+```
+
+**ES6+:**
+```js
+class User {
+  constructor(name) {
+    this.name = name;
+  }
+  
+  sayHi() {
+    return `Привет, ${this.name}`;
+  }
+}
+```
+
+### Модули
+
+**ES5:** нет встроенных модулей (использовали AMD, CommonJS)
+
+**ES6+:**
+```js
+// export
+export function add(a, b) {
+  return a + b;
+}
+
+// import
+import { add } from './math.js';
+```
+
+### Promise и async/await
+
+**ES5:** нет Promise (использовали колбэки)
+
+**ES6+:** Promise, async/await
+
+```js
+// ES6+
+async function loadData() {
+  const data = await fetch('/api');
+  return data.json();
+}
+```
+
+### Новые методы массивов
+
+**ES6+ добавил:**
+- `Array.from()`
+- `Array.find()`
+- `Array.findIndex()`
+- `Array.includes()`
+- И многие другие
+
+### Новые типы данных
+
+**ES6+ добавил:**
+- `Symbol`
+- `Map`, `Set`
+- `WeakMap`, `WeakSet`
+
+### Сравнительная таблица
+
+| Особенность | ES5 | ES6+ |
+|-------------|-----|------|
+| Переменные | `var` | `let`, `const` |
+| Функции | `function` | Стрелочные функции |
+| Строки | Конкатенация | Шаблонные строки |
+| Объекты | Ручное копирование | Деструктуризация, spread |
+| Классы | Функции-конструкторы | `class` |
+| Модули | Нет (AMD/CommonJS) | `import`/`export` |
+| Асинхронность | Колбэки | Promise, async/await |
+
+### Итоги
+
+- ES6+ добавил много возможностей
+- `let`/`const`, стрелочные функции, классы, модули
+- Promise и async/await для асинхронности
+- Деструктуризация, spread, шаблонные строки
+- Современный JavaScript проще и мощнее
+
+---
