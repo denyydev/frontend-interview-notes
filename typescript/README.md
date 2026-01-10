@@ -2,24 +2,11 @@
 
 ---
 
-## Основы TypeScript
-- Что такое TypeScript и зачем он нужен
-- Отличия TypeScript от JavaScript
-- Что компилирует TypeScript
-- Что такое `tsconfig.json`
-- Основные флаги `tsconfig` (`target`, `module`, `strict`, `lib`)
-- Что включает режим `strict`
+
 
 ---
 
-## Базовые типы
-- Базовые типы в TypeScript
-- Разница между `any`, `unknown`, `never`
-- Почему `any` — плохо
-- Когда использовать `unknown`
-- Тип `void`
-- Типы `null` и `undefined`
-- Что меняет `strictNullChecks`
+
 
 ---
 
