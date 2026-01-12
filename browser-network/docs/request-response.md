@@ -1,0 +1,5 @@
+- Request vs Response  
+- Headers  
+- Body  
+- Query params  
+- Path params  

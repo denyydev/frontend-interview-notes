@@ -14,6 +14,10 @@
 9. [Cleanup-функция в useEffect](#9-cleanup-функция-в-useeffect)
 10. [Почему нельзя делать useEffect async](#10-почему-нельзя-делать-useeffect-async)
 11. [Что такое dependency array и зачем он нужен](#11-что-такое-dependency-array-и-зачем-он-нужен)
+12. [Что такое useCallback](#12-что-такое-usecallback)
+13. [Что такое useMemo](#13-что-такое-usememo)
+14. [Что такое useRef](#14-что-такое-useref)
+15. [Что такое useContext](#15-что-такое-usecontext)
 
 ## 1. Что такое хуки
 
@@ -2148,5 +2152,1226 @@ function Component({ user }) {
 - Используй ESLint правило `exhaustive-deps` для проверки
 - Для функций используй `useCallback`
 - Для объектов/массивов используй примитивные значения
+
+---
+
+## 12. Что такое useCallback
+
+`useCallback` — это хук React, который **мемоизирует функцию**, возвращая ту же функцию между рендерами, пока не изменятся зависимости.
+
+### Базовый синтаксис
+
+```jsx
+import { useCallback } from "react";
+
+const memoizedCallback = useCallback(() => {
+  // Функция
+}, [dependencies]);
+```
+
+### Зачем нужен useCallback?
+
+Без `useCallback` функция создаётся заново при каждом рендере компонента. Это может вызвать лишние ре-рендеры дочерних компонентов, если функция передаётся как prop.
+
+### Простой пример
+
+```jsx
+function Parent() {
+  const [count, setCount] = useState(0);
+  const [name, setName] = useState("");
+
+  // ❌ Без useCallback — функция создаётся при каждом рендере
+  const handleClick = () => {
+    console.log("Клик");
+  };
+
+  // ✅ С useCallback — функция сохраняется между рендерами
+  const memoizedHandleClick = useCallback(() => {
+    console.log("Клик");
+  }, []); // Нет зависимостей — функция стабильна
+
+  return (
+    <div>
+      <input value={name} onChange={(e) => setName(e.target.value)} />
+      <Child onClick={memoizedHandleClick} />
+    </div>
+  );
+}
+```
+
+### Проблема без useCallback
+
+```jsx
+function Parent() {
+  const [count, setCount] = useState(0);
+  const [name, setName] = useState("");
+
+  // Функция создаётся заново при каждом рендере
+  const handleClick = () => {
+    console.log(count);
+  };
+
+  return (
+    <div>
+      <input value={name} onChange={(e) => setName(e.target.value)} />
+      {/* Child будет ре-рендериться при каждом изменении name,
+          потому что handleClick — новая функция */}
+      <Child onClick={handleClick} />
+    </div>
+  );
+}
+
+// Child ре-рендерится даже если onClick не изменился функционально
+const Child = React.memo(({ onClick }) => {
+  console.log("Child рендерится");
+  return <button onClick={onClick}>Кнопка</button>;
+});
+```
+
+### Решение с useCallback
+
+```jsx
+function Parent() {
+  const [count, setCount] = useState(0);
+  const [name, setName] = useState("");
+
+  // Функция сохраняется между рендерами
+  const handleClick = useCallback(() => {
+    console.log(count);
+  }, [count]); // Функция обновится только при изменении count
+
+  return (
+    <div>
+      <input value={name} onChange={(e) => setName(e.target.value)} />
+      {/* Child НЕ будет ре-рендериться при изменении name,
+          потому что handleClick — та же функция */}
+      <Child onClick={handleClick} />
+    </div>
+  );
+}
+```
+
+### Использование с зависимостями
+
+```jsx
+function Component({ userId }) {
+  const [filter, setFilter] = useState("all");
+
+  // Функция обновится при изменении userId или filter
+  const fetchData = useCallback(async () => {
+    const data = await api.fetch(userId, filter);
+    return data;
+  }, [userId, filter]); // Зависимости
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]); // fetchData стабильна, если userId и filter не меняются
+}
+```
+
+### Когда использовать useCallback?
+
+Используй `useCallback`, когда:
+
+1. **Функция передаётся в дочерний компонент**, обёрнутый в `React.memo`
+2. **Функция используется в зависимостях других хуков** (`useEffect`, `useMemo`)
+3. **Функция используется в других мемоизированных функциях** (через `useCallback` или `useMemo`)
+
+Не используй `useCallback`, когда:
+
+- Функция не передаётся в дочерние компоненты
+- Функция не используется в зависимостях
+- Оптимизация не нужна (преждевременная оптимизация)
+
+### Примеры
+
+#### Пример 1: С React.memo
+
+```jsx
+function TodoList({ todos }) {
+  const [filter, setFilter] = useState("all");
+
+  const handleToggle = useCallback((id) => {
+    // Переключение todo
+  }, []); // Стабильная функция
+
+  const filteredTodos = todos.filter(/* ... */);
+
+  return (
+    <div>
+      {filteredTodos.map((todo) => (
+        <TodoItem
+          key={todo.id}
+          todo={todo}
+          onToggle={handleToggle} // Стабильная функция — TodoItem не ре-рендерится
+        />
+      ))}
+    </div>
+  );
+}
+
+const TodoItem = React.memo(({ todo, onToggle }) => {
+  return (
+    <div>
+      <input
+        type="checkbox"
+        checked={todo.completed}
+        onChange={() => onToggle(todo.id)}
+      />
+      {todo.text}
+    </div>
+  );
+});
+```
+
+#### Пример 2: С useEffect
+
+```jsx
+function Component({ userId }) {
+  const [data, setData] = useState(null);
+
+  // Без useCallback — функция создаётся заново, эффект выполняется каждый раз
+  // const fetchData = () => { ... };
+
+  // С useCallback — функция стабильна
+  const fetchData = useCallback(async () => {
+    const result = await api.fetch(userId);
+    setData(result);
+  }, [userId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]); // fetchData стабильна, если userId не меняется
+}
+```
+
+### useCallback vs обычная функция
+
+```jsx
+function Component() {
+  const [count, setCount] = useState(0);
+
+  // Обычная функция — создаётся при каждом рендере
+  const handleClick1 = () => {
+    console.log(count);
+  };
+
+  // useCallback — сохраняется между рендерами
+  const handleClick2 = useCallback(() => {
+    console.log(count);
+  }, [count]);
+
+  // handleClick1 !== handleClick1 (новая функция каждый раз)
+  // handleClick2 === handleClick2 (та же функция, пока count не изменится)
+}
+```
+
+### Визуальная аналогия
+
+`useCallback` — как **записная книжка с функциями**:
+- Без `useCallback` — пишешь функцию заново каждый раз (новая страница)
+- С `useCallback` — используешь ту же запись из книги, пока зависимости не изменятся
+- Экономит время на "переписывание" и предотвращает лишние ре-рендеры
+
+### ⚠️ Частая ошибка
+
+Используют `useCallback` везде без необходимости:
+
+```jsx
+// ❌ Не нужно — функция не передаётся в дочерние компоненты
+function Component() {
+  const handleClick = useCallback(() => {
+    console.log("Клик");
+  }, []);
+
+  return <button onClick={handleClick}>Кнопка</button>;
+}
+
+// ✅ Лучше — простая функция
+function Component() {
+  const handleClick = () => {
+    console.log("Клик");
+  };
+
+  return <button onClick={handleClick}>Кнопка</button>;
+}
+```
+
+### Итоги
+
+- `useCallback` мемоизирует функцию между рендерами
+- Используй для функций, передаваемых в компоненты с `React.memo`
+- Используй для функций в зависимостях других хуков
+- Не используй без необходимости (преждевременная оптимизация)
+- Зависимости определяют, когда функция обновится
+
+---
+
+## 13. Что такое useMemo
+
+`useMemo` — это хук React, который **мемоизирует результат вычисления**, возвращая кешированное значение между рендерами, пока не изменятся зависимости.
+
+### Базовый синтаксис
+
+```jsx
+import { useMemo } from "react";
+
+const memoizedValue = useMemo(() => {
+  return expensiveCalculation(a, b);
+}, [a, b]);
+```
+
+### Зачем нужен useMemo?
+
+`useMemo` предотвращает повторные дорогие вычисления при каждом рендере, кешируя результат до изменения зависимостей.
+
+### Простой пример
+
+```jsx
+function Component({ items, filter }) {
+  // ❌ Без useMemo — вычисляется при каждом рендере
+  const filteredItems = items.filter((item) => item.category === filter);
+
+  // ✅ С useMemo — вычисляется только при изменении items или filter
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => item.category === filter);
+  }, [items, filter]);
+
+  return <div>{/* Используем filteredItems */}</div>;
+}
+```
+
+### Дорогие вычисления
+
+```jsx
+function Component({ numbers }) {
+  // Дорогое вычисление (сортировка большого массива)
+  const sortedNumbers = useMemo(() => {
+    console.log("Сортировка...");
+    return [...numbers].sort((a, b) => a - b);
+  }, [numbers]); // Вычисляется только при изменении numbers
+
+  return <div>{sortedNumbers.join(", ")}</div>;
+}
+```
+
+### Сравнение без useMemo
+
+```jsx
+function Component({ items, filter }) {
+  const [count, setCount] = useState(0);
+
+  // ❌ Проблема: фильтрация выполняется при каждом рендере
+  // Даже если items и filter не изменились
+  const filteredItems = items.filter((item) => item.category === filter);
+
+  return (
+    <div>
+      <button onClick={() => setCount(count + 1)}>Счёт: {count}</button>
+      {/* filteredItems пересчитывается при каждом клике! */}
+      <List items={filteredItems} />
+    </div>
+  );
+}
+```
+
+### С useMemo
+
+```jsx
+function Component({ items, filter }) {
+  const [count, setCount] = useState(0);
+
+  // ✅ Решение: фильтрация выполняется только при изменении items или filter
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => item.category === filter);
+  }, [items, filter]);
+
+  return (
+    <div>
+      <button onClick={() => setCount(count + 1)}>Счёт: {count}</button>
+      {/* filteredItems НЕ пересчитывается при изменении count */}
+      <List items={filteredItems} />
+    </div>
+  );
+}
+```
+
+### Использование с объектами и массивами
+
+`useMemo` полезен для стабилизации ссылок на объекты и массивы:
+
+```jsx
+function Component({ userId }) {
+  const [count, setCount] = useState(0);
+
+  // ❌ Проблема: новый объект при каждом рендере
+  const config = {
+    userId,
+    theme: "dark",
+  };
+
+  // ✅ Решение: тот же объект, пока userId не изменится
+  const config = useMemo(
+    () => ({
+      userId,
+      theme: "dark",
+    }),
+    [userId]
+  );
+
+  useEffect(() => {
+    api.update(config);
+  }, [config]); // config стабилен, эффект не выполняется лишний раз
+}
+```
+
+### Когда использовать useMemo?
+
+Используй `useMemo`, когда:
+
+1. **Вычисления дорогие** (сложные алгоритмы, большие массивы)
+2. **Нужна стабильная ссылка** на объект или массив для зависимостей
+3. **Оптимизация действительно нужна** (измерена проблема производительности)
+
+Не используй `useMemo`, когда:
+
+- Вычисления простые и быстрые
+- Оптимизация не нужна (преждевременная оптимизация)
+- Значение примитивное (не нужна стабильность ссылки)
+
+### Примеры
+
+#### Пример 1: Сортировка и фильтрация
+
+```jsx
+function ProductList({ products, category, sortBy }) {
+  const processedProducts = useMemo(() => {
+    console.log("Обработка продуктов...");
+    let filtered = products.filter((p) => p.category === category);
+    
+    if (sortBy === "price") {
+      filtered.sort((a, b) => a.price - b.price);
+    } else if (sortBy === "name") {
+      filtered.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    
+    return filtered;
+  }, [products, category, sortBy]);
+
+  return (
+    <div>
+      {processedProducts.map((product) => (
+        <Product key={product.id} product={product} />
+      ))}
+    </div>
+  );
+}
+```
+
+#### Пример 2: Стабильная конфигурация
+
+```jsx
+function Chart({ data, options }) {
+  // Стабильная конфигурация для библиотеки графиков
+  const chartConfig = useMemo(
+    () => ({
+      type: "line",
+      data,
+      options: {
+        ...options,
+        responsive: true,
+      },
+    }),
+    [data, options]
+  );
+
+  useEffect(() => {
+    const chart = new ChartJS(chartConfig);
+    return () => chart.destroy();
+  }, [chartConfig]); // chartConfig стабилен
+}
+```
+
+#### Пример 3: Мемоизация для дочерних компонентов
+
+```jsx
+function Parent({ items }) {
+  const [count, setCount] = useState(0);
+
+  // Стабильный массив для дочернего компонента
+  const processedItems = useMemo(() => {
+    return items.map((item) => ({
+      ...item,
+      processed: true,
+    }));
+  }, [items]);
+
+  return (
+    <div>
+      <button onClick={() => setCount(count + 1)}>Счёт: {count}</button>
+      {/* ExpensiveChild не ре-рендерится при изменении count */}
+      <ExpensiveChild items={processedItems} />
+    </div>
+  );
+}
+
+const ExpensiveChild = React.memo(({ items }) => {
+  // Дорогой рендер
+  return <div>{/* ... */}</div>;
+});
+```
+
+### useMemo vs обычное вычисление
+
+```jsx
+function Component({ numbers }) {
+  const [count, setCount] = useState(0);
+
+  // ❌ Без useMemo — вычисляется при каждом рендере
+  const sum = numbers.reduce((a, b) => a + b, 0);
+
+  // ✅ С useMemo — вычисляется только при изменении numbers
+  const sum = useMemo(() => {
+    return numbers.reduce((a, b) => a + b, 0);
+  }, [numbers]);
+}
+```
+
+### useMemo vs useCallback
+
+| `useMemo` | `useCallback` |
+|-----------|---------------|
+| Мемоизирует **значение** | Мемоизирует **функцию** |
+| Возвращает результат вычисления | Возвращает функцию |
+| `useMemo(() => value, deps)` | `useCallback(() => {...}, deps)` |
+| Эквивалент `useCallback`: `useMemo(() => fn, deps)` | Эквивалент `useMemo`: `useCallback(fn, deps)` |
+
+```jsx
+// Эквивалентны:
+const memoizedCallback = useCallback(() => doSomething(a, b), [a, b]);
+const memoizedCallback = useMemo(() => () => doSomething(a, b), [a, b]);
+```
+
+### Визуальная аналогия
+
+`useMemo` — как **кеш калькулятора**:
+- Без `useMemo` — пересчитываешь результат каждый раз, даже с теми же числами
+- С `useMemo` — сохраняешь результат в памяти и используешь его, пока числа не изменятся
+- Экономит время на повторные вычисления
+
+### ⚠️ Частая ошибка
+
+Используют `useMemo` для простых вычислений:
+
+```jsx
+// ❌ Не нужно — простое сложение
+function Component({ a, b }) {
+  const sum = useMemo(() => a + b, [a, b]);
+  return <div>{sum}</div>;
+}
+
+// ✅ Лучше — простое вычисление
+function Component({ a, b }) {
+  const sum = a + b;
+  return <div>{sum}</div>;
+}
+```
+
+### Итоги
+
+- `useMemo` мемоизирует результат вычисления между рендерами
+- Используй для дорогих вычислений
+- Используй для стабилизации ссылок на объекты и массивы
+- Не используй без необходимости (преждевременная оптимизация)
+- Зависимости определяют, когда значение пересчитается
+
+---
+
+## 14. Что такое useRef
+
+`useRef` — это хук React, который возвращает **изменяемый объект** с свойством `current`, которое сохраняет значение между рендерами и не вызывает ре-рендер при изменении.
+
+### Базовый синтаксис
+
+```jsx
+import { useRef } from "react";
+
+const ref = useRef(initialValue);
+// ref.current — текущее значение
+```
+
+### Зачем нужен useRef?
+
+`useRef` используется для:
+1. **Хранения ссылок на DOM элементы**
+2. **Хранения изменяемых значений**, которые не вызывают ре-рендер
+3. **Сохранения предыдущих значений**
+
+### Основные случаи использования
+
+#### 1. Ссылка на DOM элемент
+
+```jsx
+function TextInput() {
+  const inputRef = useRef(null);
+
+  const handleFocus = () => {
+    inputRef.current.focus(); // Фокус на input
+  };
+
+  return (
+    <div>
+      <input ref={inputRef} type="text" />
+      <button onClick={handleFocus}>Фокус</button>
+    </div>
+  );
+}
+```
+
+#### 2. Хранение значений без ре-рендера
+
+```jsx
+function Component() {
+  const [count, setCount] = useState(0);
+  const renderCount = useRef(0); // Не вызывает ре-рендер
+
+  renderCount.current += 1; // Обновляется без ре-рендера
+
+  return (
+    <div>
+      <p>Счёт: {count}</p>
+      <p>Рендеров: {renderCount.current}</p>
+      <button onClick={() => setCount(count + 1)}>Увеличить</button>
+    </div>
+  );
+}
+```
+
+#### 3. Сохранение предыдущего значения
+
+```jsx
+function Component({ value }) {
+  const prevValueRef = useRef();
+
+  useEffect(() => {
+    prevValueRef.current = value;
+  });
+
+  const prevValue = prevValueRef.current;
+
+  return (
+    <div>
+      <p>Текущее: {value}</p>
+      <p>Предыдущее: {prevValue}</p>
+    </div>
+  );
+}
+```
+
+### useRef vs useState
+
+| `useRef` | `useState` |
+|----------|------------|
+| Не вызывает ре-рендер | Вызывает ре-рендер |
+| Изменяемое значение (`ref.current = ...`) | Неизменяемое значение (через setter) |
+| Синхронное обновление | Асинхронное обновление |
+| Сохраняется между рендерами | Сохраняется между рендерами |
+
+```jsx
+function Component() {
+  const [count, setCount] = useState(0);
+  const countRef = useRef(0);
+
+  const handleClick = () => {
+    setCount(count + 1); // ✅ Вызовет ре-рендер
+    countRef.current += 1; // ❌ НЕ вызовет ре-рендер
+    console.log(countRef.current); // Можно сразу использовать
+  };
+
+  return (
+    <div>
+      <p>State: {count}</p>
+      <p>Ref: {countRef.current}</p>
+      <button onClick={handleClick}>Клик</button>
+    </div>
+  );
+}
+```
+
+### Примеры
+
+#### Пример 1: Фокус на input
+
+```jsx
+function LoginForm() {
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
+
+  const handleEmailEnter = (e) => {
+    if (e.key === "Enter") {
+      passwordRef.current.focus();
+    }
+  };
+
+  return (
+    <form>
+      <input
+        ref={emailRef}
+        type="email"
+        onKeyDown={handleEmailEnter}
+        placeholder="Email"
+      />
+      <input
+        ref={passwordRef}
+        type="password"
+        placeholder="Password"
+      />
+      <button type="submit">Войти</button>
+    </form>
+  );
+}
+```
+
+#### Пример 2: Счётчик без ре-рендера
+
+```jsx
+function Timer() {
+  const [seconds, setSeconds] = useState(0);
+  const intervalRef = useRef(null);
+
+  const start = () => {
+    intervalRef.current = setInterval(() => {
+      setSeconds((prev) => prev + 1);
+    }, 1000);
+  };
+
+  const stop = () => {
+    clearInterval(intervalRef.current);
+  };
+
+  return (
+    <div>
+      <p>Секунд: {seconds}</p>
+      <button onClick={start}>Старт</button>
+      <button onClick={stop}>Стоп</button>
+    </div>
+  );
+}
+```
+
+#### Пример 3: Предыдущее значение
+
+```jsx
+function Component({ userId }) {
+  const prevUserIdRef = useRef();
+
+  useEffect(() => {
+    if (prevUserIdRef.current !== userId) {
+      console.log(`userId изменился с ${prevUserIdRef.current} на ${userId}`);
+      prevUserIdRef.current = userId;
+    }
+  }, [userId]);
+
+  return <div>User ID: {userId}</div>;
+}
+```
+
+#### Пример 4: Сохранение таймера
+
+```jsx
+function Component() {
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      console.log("Тик");
+    }, 1000);
+
+    return () => {
+      clearInterval(timerRef.current); // Очистка таймера
+    };
+  }, []);
+
+  return <div>Компонент</div>;
+}
+```
+
+### Особенности useRef
+
+#### 1. Объект ref постоянен между рендерами
+
+```jsx
+function Component() {
+  const ref = useRef(0);
+
+  console.log(ref); // Всегда один и тот же объект
+  // { current: 0 }
+
+  ref.current = 5;
+  console.log(ref); // Тот же объект, но current изменился
+  // { current: 5 }
+}
+```
+
+#### 2. Изменение current не вызывает ре-рендер
+
+```jsx
+function Component() {
+  const countRef = useRef(0);
+
+  const increment = () => {
+    countRef.current += 1;
+    console.log(countRef.current); // Изменилось, но ре-рендера нет
+  };
+
+  return (
+    <div>
+      <p>Счёт: {countRef.current}</p>
+      {/* Значение не обновится в UI! */}
+      <button onClick={increment}>Увеличить</button>
+    </div>
+  );
+}
+```
+
+#### 3. Инициализация только при первом рендере
+
+```jsx
+function Component({ initialValue }) {
+  const ref = useRef(initialValue);
+  // initialValue используется только при первом рендере
+  // Последующие изменения initialValue игнорируются
+}
+```
+
+### Callback ref
+
+Вместо объекта ref можно использовать callback функцию:
+
+```jsx
+function Component() {
+  const inputRef = useRef(null);
+
+  // Callback ref
+  const setInputRef = (element) => {
+    inputRef.current = element;
+  };
+
+  return <input ref={setInputRef} />;
+}
+
+// Или короче:
+return <input ref={(el) => (inputRef.current = el)} />;
+```
+
+### Визуальная аналогия
+
+`useRef` — как **ящик с переменной**:
+- Можно положить значение в ящик (`ref.current = value`)
+- Значение сохраняется между рендерами
+- Но изменение содержимого ящика не вызывает ре-рендер (в отличие от `useState`)
+- Как личная записная книжка — пишешь, читаешь, но это не влияет на интерфейс
+
+### ⚠️ Частая ошибка
+
+Пытаются использовать `ref.current` для отображения в UI:
+
+```jsx
+// ❌ Неправильно — значение не обновится в UI
+function Component() {
+  const countRef = useRef(0);
+
+  return (
+    <div>
+      <p>{countRef.current}</p>
+      <button onClick={() => (countRef.current += 1)}>Увеличить</button>
+    </div>
+  );
+}
+
+// ✅ Правильно — используй useState для UI
+function Component() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <div>
+      <p>{count}</p>
+      <button onClick={() => setCount(count + 1)}>Увеличить</button>
+    </div>
+  );
+}
+```
+
+### Итоги
+
+- `useRef` возвращает изменяемый объект с свойством `current`
+- Не вызывает ре-рендер при изменении `current`
+- Используется для ссылок на DOM элементы
+- Используется для хранения значений без ре-рендера
+- Используется для сохранения предыдущих значений
+- Объект ref постоянен между рендерами
+
+---
+
+## 15. Что такое useContext
+
+`useContext` — это хук React, который позволяет **получать значение контекста** в функциональных компонентах без использования Consumer компонента.
+
+### Базовый синтаксис
+
+```jsx
+import { useContext } from "react";
+
+const value = useContext(MyContext);
+```
+
+### Зачем нужен useContext?
+
+`useContext` упрощает доступ к контексту React, избавляя от необходимости использовать `<Context.Consumer>` и вложенные компоненты.
+
+### Создание контекста
+
+Сначала нужно создать контекст:
+
+```jsx
+import { createContext } from "react";
+
+const ThemeContext = createContext("light"); // Значение по умолчанию
+```
+
+### Предоставление контекста
+
+Контекст предоставляется через Provider:
+
+```jsx
+function App() {
+  const [theme, setTheme] = useState("dark");
+
+  return (
+    <ThemeContext.Provider value={theme}>
+      <Toolbar />
+    </ThemeContext.Provider>
+  );
+}
+```
+
+### Использование useContext
+
+```jsx
+function Toolbar() {
+  const theme = useContext(ThemeContext); // Получаем значение
+
+  return (
+    <div className={theme}>
+      <button>Кнопка</button>
+    </div>
+  );
+}
+```
+
+### Сравнение с Consumer
+
+**Без useContext (старый способ):**
+
+```jsx
+function Toolbar() {
+  return (
+    <ThemeContext.Consumer>
+      {(theme) => (
+        <div className={theme}>
+          <button>Кнопка</button>
+        </div>
+      )}
+    </ThemeContext.Consumer>
+  );
+}
+```
+
+**С useContext (новый способ):**
+
+```jsx
+function Toolbar() {
+  const theme = useContext(ThemeContext);
+
+  return (
+    <div className={theme}>
+      <button>Кнопка</button>
+    </div>
+  );
+}
+```
+
+### Полный пример
+
+```jsx
+import { createContext, useContext, useState } from "react";
+
+// Создание контекста
+const ThemeContext = createContext("light");
+
+function App() {
+  const [theme, setTheme] = useState("dark");
+
+  return (
+    <ThemeContext.Provider value={theme}>
+      <Toolbar />
+      <button onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
+        Переключить тему
+      </button>
+    </ThemeContext.Provider>
+  );
+}
+
+function Toolbar() {
+  return (
+    <div>
+      <ThemedButton />
+    </div>
+  );
+}
+
+function ThemedButton() {
+  const theme = useContext(ThemeContext); // Получаем тему
+
+  return (
+    <button
+      style={{
+        backgroundColor: theme === "dark" ? "#333" : "#fff",
+        color: theme === "dark" ? "#fff" : "#333",
+      }}
+    >
+      Кнопка
+    </button>
+  );
+}
+```
+
+### Контекст с несколькими значениями
+
+```jsx
+const UserContext = createContext({
+  user: null,
+  setUser: () => {},
+});
+
+function App() {
+  const [user, setUser] = useState(null);
+
+  return (
+    <UserContext.Provider value={{ user, setUser }}>
+      <Profile />
+    </UserContext.Provider>
+  );
+}
+
+function Profile() {
+  const { user, setUser } = useContext(UserContext);
+
+  return (
+    <div>
+      <p>Пользователь: {user?.name}</p>
+      <button onClick={() => setUser({ name: "Алекс" })}>
+        Установить пользователя
+      </button>
+    </div>
+  );
+}
+```
+
+### Кастомный хук для контекста
+
+Можно создать кастомный хук для удобства:
+
+```jsx
+function useTheme() {
+  const context = useContext(ThemeContext);
+  
+  if (!context) {
+    throw new Error("useTheme must be used within ThemeProvider");
+  }
+  
+  return context;
+}
+
+// Использование
+function Component() {
+  const theme = useTheme(); // Проще и безопаснее
+  return <div className={theme}>...</div>;
+}
+```
+
+### Когда использовать useContext?
+
+Используй `useContext`, когда:
+
+1. **Нужно передать данные через несколько уровней** (избежать prop drilling)
+2. **Данные используются многими компонентами** (тема, язык, пользователь)
+3. **Данные меняются редко** (контекст не оптимизирован для частых изменений)
+
+Не используй `useContext` для:
+
+- Данных, которые часто меняются (может вызвать лишние ре-рендеры)
+- Локального состояния компонента (лучше `useState`)
+- Замены props для прямых родитель-дочерних связей
+
+### Примеры
+
+#### Пример 1: Тема приложения
+
+```jsx
+const ThemeContext = createContext("light");
+
+function ThemeProvider({ children }) {
+  const [theme, setTheme] = useState("light");
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+function Header() {
+  const { theme, setTheme } = useContext(ThemeContext);
+
+  return (
+    <header className={theme}>
+      <button onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
+        Переключить тему
+      </button>
+    </header>
+  );
+}
+```
+
+#### Пример 2: Аутентификация
+
+```jsx
+const AuthContext = createContext(null);
+
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+
+  const login = (userData) => setUser(userData);
+  const logout = () => setUser(null);
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+function Profile() {
+  const { user, logout } = useContext(AuthContext);
+
+  if (!user) return <div>Не авторизован</div>;
+
+  return (
+    <div>
+      <p>Привет, {user.name}!</p>
+      <button onClick={logout}>Выйти</button>
+    </div>
+  );
+}
+```
+
+#### Пример 3: Язык интерфейса
+
+```jsx
+const LanguageContext = createContext("ru");
+
+const translations = {
+  ru: { hello: "Привет", goodbye: "Пока" },
+  en: { hello: "Hello", goodbye: "Goodbye" },
+};
+
+function LanguageProvider({ children }) {
+  const [language, setLanguage] = useState("ru");
+
+  return (
+    <LanguageContext.Provider value={{ language, setLanguage }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+}
+
+function Greeting() {
+  const { language } = useContext(LanguageContext);
+  const t = translations[language];
+
+  return <p>{t.hello}</p>;
+}
+```
+
+### useContext и ре-рендеры
+
+Все компоненты, использующие `useContext`, будут ре-рендериться при изменении значения контекста:
+
+```jsx
+function App() {
+  const [theme, setTheme] = useState("light");
+
+  return (
+    <ThemeContext.Provider value={theme}>
+      {/* Все компоненты внутри ре-рендерятся при изменении theme */}
+      <Header />
+      <Content />
+      <Footer />
+    </ThemeContext.Provider>
+  );
+}
+```
+
+Для оптимизации можно разделить контексты или использовать `React.memo`:
+
+```jsx
+const ThemeContext = createContext("light");
+const UserContext = createContext(null);
+
+// Разделение контекстов предотвращает лишние ре-рендеры
+```
+
+### Визуальная аналогия
+
+`useContext` — как **глобальный почтовый ящик**:
+- Provider кладёт письмо в ящик (предоставляет значение)
+- `useContext` достаёт письмо из ящика (получает значение)
+- Любой компонент внутри Provider может прочитать письмо
+- Не нужно передавать письмо через каждого посредника (prop drilling)
+
+### ⚠️ Частая ошибка
+
+Используют контекст для данных, которые часто меняются:
+
+```jsx
+// ❌ Плохо — каждое изменение вызывает ре-рендер всех потребителей
+const CountContext = createContext(0);
+
+function App() {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <CountContext.Provider value={count}>
+      {/* Все компоненты ре-рендерятся при каждом изменении count */}
+    </CountContext.Provider>
+  );
+}
+
+// ✅ Лучше — использовать useState для локального состояния
+function Component() {
+  const [count, setCount] = useState(0);
+  // Ре-рендер только этого компонента
+}
+```
+
+### Итоги
+
+- `useContext` позволяет получать значение контекста в функциональных компонентах
+- Упрощает код по сравнению с Consumer компонентом
+- Используется для передачи данных через несколько уровней
+- Все потребители ре-рендерятся при изменении контекста
+- Лучше использовать для данных, которые меняются редко
+- Можно создать кастомный хук для удобства
 
 ---

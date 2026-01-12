@@ -1,0 +1,3 @@
+- CORS  
+- Preflight request  
+- Почему Postman работает, а браузер — нет  
