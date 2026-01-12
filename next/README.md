@@ -15,3 +15,9 @@ getStaticPaths
 SEO и почему Next лучше чистого React
 
 Разница pages router vs app router (база)
+
+client vs server
+
+что нельзя использовать на сервере (window, localStorage)
+
+зачем нужен "use client"
